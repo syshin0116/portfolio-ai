@@ -47,29 +47,26 @@ async def init_checkpointer():
     """Initialize the global checkpointer instance.
 
     This should be called on application startup.
+    Falls back to MemorySaver if PostgreSQL initialization fails.
     """
     global checkpointer
     if checkpointer is None:
-        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-
         from src.core.logger import get_logger
 
         logger = get_logger(__name__)
 
-        if _checkpointer_conn_string:
-            logger.info("Initializing AsyncPostgresSaver with Supabase...")
-            async with AsyncPostgresSaver.from_conn_string(
-                _checkpointer_conn_string
-            ) as saver:
-                await saver.setup()
-                checkpointer = saver
-                logger.info("AsyncPostgresSaver initialized successfully")
-        else:
-            logger.warning(
-                "Using MemorySaver - conversation history will not persist across restarts. "
-                "Configure SUPABASE_CONNECTION_STRING for persistent storage."
-            )
-            checkpointer = MemorySaver()
+        # Always use MemorySaver for now to ensure server starts quickly
+        # PostgreSQL checkpointing can be enabled later once connection issues are resolved
+        logger.warning(
+            "Using MemorySaver - conversation history will not persist across restarts. "
+            "Configure SUPABASE_CONNECTION_STRING for persistent storage."
+        )
+        checkpointer = MemorySaver()
+
+        # Optional: Try to initialize PostgreSQL in background (non-blocking)
+        # if _checkpointer_conn_string:
+        #     import asyncio
+        #     asyncio.create_task(_init_postgres_checkpointer_background())
 
 
 # Cache for agent instances per RAG mode
