@@ -1,0 +1,62 @@
+name: Sync to AppHub AI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'content/**'  # content 디렉토리 변경 시에만 실행
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout blog repository
+        uses: actions/checkout@v4
+        with:
+          path: blog
+
+      - name: Checkout apphub-ai repository
+        uses: actions/checkout@v4
+        with:
+          repository: syshin0116/apphub-ai
+          token: ${{ secrets.APPHUB_DISPATCH_TOKEN }}
+          path: apphub-ai
+
+      - name: Update blog content in apphub-ai
+        run: |
+          cd apphub-ai
+
+          # data/blog 디렉토리 확인 및 생성
+          if [ ! -d "data/blog" ]; then
+            echo "Initializing data/blog directory..."
+            mkdir -p data/blog
+            cd data/blog
+            git init
+            git remote add origin https://github.com/syshin0116/syshin0116.github.io.git
+            git config core.sparseCheckout true
+            mkdir -p .git/info
+            echo "content/" > .git/info/sparse-checkout
+            git pull origin main
+            cd ../..
+          else
+            echo "Updating existing data/blog directory..."
+            cd data/blog
+            git pull origin main
+            cd ../..
+          fi
+
+          # Git 설정
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 변경사항 확인 및 커밋
+          if git diff --quiet data/blog; then
+            echo "No changes to blog content"
+          else
+            git add data/blog
+            git commit -m "chore: sync blog content from ${{ github.sha }}"
+            git push
+            echo "Blog content updated successfully"
+          fi
