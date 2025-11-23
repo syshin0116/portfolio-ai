@@ -14,6 +14,7 @@ from typing_extensions import TypedDict
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
 from src.agent.prompts import DEFAULT_SYSTEM_PROMPT
+from src.tools.blog import search_blog_summaries, get_blog_content
 import os
 
 
@@ -34,4 +35,5 @@ model = init_chat_model(
 graph = create_deep_agent(
     model=model,
     system_prompt=DEFAULT_SYSTEM_PROMPT,
+    tools=[search_blog_summaries, get_blog_content],
 )
