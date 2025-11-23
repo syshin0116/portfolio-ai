@@ -1,0 +1,41 @@
+name: Sync Blog Content
+
+on:
+  # 블로그 레포에서 repository_dispatch 이벤트를 받을 때
+  repository_dispatch:
+    types: [blog-updated]
+
+  # 수동으로 실행 가능
+  workflow_dispatch:
+
+  # 매일 자동으로 체크 (옵션)
+  schedule:
+    - cron: '0 0 * * *'  # 매일 자정 UTC
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update blog submodule
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 서브모듈을 최신 커밋으로 업데이트
+          git submodule update --remote data/blog
+
+          # 변경사항이 있는지 확인
+          if git diff --quiet data/blog; then
+            echo "No changes to blog content"
+          else
+            git add data/blog
+            git commit -m "chore: update blog content from syshin0116.github.io"
+            git push
+          fi

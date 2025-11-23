@@ -11,6 +11,10 @@ from typing import Any, Dict
 from langgraph.graph import StateGraph
 from langgraph.runtime import Runtime
 from typing_extensions import TypedDict
+from deepagents import create_deep_agent
+from langchain.chat_models import init_chat_model
+from src.agent.prompts import DEFAULT_SYSTEM_PROMPT
+import os
 
 
 class Context(TypedDict):
@@ -20,35 +24,14 @@ class Context(TypedDict):
     See: https://langchain-ai.github.io/langgraph/cloud/how-tos/configuration_cloud/
     """
 
-    my_configurable_param: str
+    model_name: str = "gpt-4.1-nano"
 
 
-@dataclass
-class State:
-    """Input state for the agent.
+model = init_chat_model(
+    Context.model_name, model_provider="openai", api_key=os.getenv("OPENAI_API_KEY")
+)
 
-    Defines the initial structure of incoming data.
-    See: https://langchain-ai.github.io/langgraph/concepts/low_level/#state
-    """
-
-    changeme: str = "example"
-
-
-async def call_model(state: State, runtime: Runtime[Context]) -> Dict[str, Any]:
-    """Process input and returns output.
-
-    Can use runtime context to alter behavior.
-    """
-    return {
-        "changeme": "output from call_model. "
-        f"Configured with {(runtime.context or {}).get('my_configurable_param')}"
-    }
-
-
-# Define the graph
-graph = (
-    StateGraph(State, context_schema=Context)
-    .add_node(call_model)
-    .add_edge("__start__", "call_model")
-    .compile(name="New Graph")
+graph = create_deep_agent(
+    model=model,
+    system_prompt=DEFAULT_SYSTEM_PROMPT,
 )
