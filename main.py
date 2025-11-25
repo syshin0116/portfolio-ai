@@ -124,12 +124,8 @@ async def chat_stream(request: ChatRequest):
                 config=config,
                 version="v2"
             ):
-                # Filter for LLM token events
-                if event["event"] == "on_chat_model_stream":
-                    content = event["data"]["chunk"].content
-                    if content:
-                        # Send SSE format
-                        yield f"data: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
+                # Send all events (client can filter)
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
             # Send completion signal
             yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
