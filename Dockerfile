@@ -23,9 +23,8 @@ RUN apt-get update && apt-get install -y \
 # Copy dependency files first for better layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies using cache mount
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+# Install dependencies
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
 COPY src/ ./src/
@@ -34,8 +33,7 @@ COPY static/ ./static/
 COPY main.py ./
 
 # Install project
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev
 
 # Runtime stage
 FROM python:3.13-slim
