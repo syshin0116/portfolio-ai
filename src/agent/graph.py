@@ -10,6 +10,7 @@ from typing import Any, Dict
 
 from langgraph.graph import StateGraph
 from langgraph.runtime import Runtime
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from typing_extensions import TypedDict
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
@@ -32,8 +33,17 @@ model = init_chat_model(
     Context.model_name, model_provider="openai", api_key=os.getenv("OPENAI_API_KEY")
 )
 
+# Setup Supabase/Postgres checkpointer for conversation memory (async)
+checkpointer = None
+if os.getenv("SUPABASE_CONNECTION_STRING"):
+    checkpointer = AsyncPostgresSaver.from_conn_string(
+        os.getenv("SUPABASE_CONNECTION_STRING")
+    )
+    # Note: AsyncPostgresSaver.setup() will be called automatically on first use
+
 graph = create_deep_agent(
     model=model,
     system_prompt=DEFAULT_SYSTEM_PROMPT,
     tools=[search_blog_summaries, get_blog_content],
+    checkpointer=checkpointer,
 )
