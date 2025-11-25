@@ -129,13 +129,13 @@ async def chat_stream(request: ChatRequest):
                     content = event["data"]["chunk"].content
                     if content:
                         # Send SSE format
-                        yield f"data: {json.dumps({'content': content})}\n\n"
+                        yield f"data: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
 
             # Send completion signal
-            yield f"data: {json.dumps({'done': True})}\n\n"
+            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         generate(),
