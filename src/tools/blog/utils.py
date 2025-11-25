@@ -62,6 +62,28 @@ def get_blog_url(file_path: str | Path) -> str:
     return f"https://syshin0116.github.io/{url_path}"
 
 
+def extract_first_image(content: str) -> str:
+    """Extract first image URL from markdown content.
+
+    Args:
+        content: Markdown content
+
+    Returns:
+        First image URL found, or empty string if none
+    """
+    # Match markdown image syntax: ![alt](url)
+    match = re.search(r"!\[.*?\]\((.*?)\)", content)
+    if match:
+        return match.group(1)
+
+    # Match HTML img tag: <img src="url">
+    match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', content)
+    if match:
+        return match.group(1)
+
+    return ""
+
+
 def get_blog_metadata(file_path: str | Path) -> dict[str, Any]:
     """Get comprehensive metadata from blog post.
 
@@ -69,12 +91,16 @@ def get_blog_metadata(file_path: str | Path) -> dict[str, Any]:
         file_path: Path to markdown file
 
     Returns:
-        Dictionary with title, summary, description, tags, date, file path, and URL
+        Dictionary with title, summary, description, tags, date, file path, URL, and image
     """
     frontmatter = extract_frontmatter(file_path)
 
     tags = frontmatter.get("tags") or []
     categories = frontmatter.get("categories") or []
+
+    # Extract first image from content
+    content = read_full_content(file_path)
+    image = extract_first_image(content)
 
     return {
         "title": frontmatter.get("title", ""),
@@ -83,6 +109,7 @@ def get_blog_metadata(file_path: str | Path) -> dict[str, Any]:
         "tags": tags if isinstance(tags, list) else [],
         "date": frontmatter.get("date", ""),
         "categories": categories if isinstance(categories, list) else [],
+        "image": image,
         "file_path": str(file_path),
         "url": get_blog_url(file_path),
     }
