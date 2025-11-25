@@ -22,11 +22,12 @@ env/
 *.swo
 *~
 
-# Git
+# Git (but keep data directory)
 .git/
 .gitignore
 .gitmodules
 .github/
+!data/
 
 # LangGraph development
 .langgraph_api/
@@ -42,10 +43,11 @@ tests/
 pytest.ini
 .pytest_cache/
 
-# Documentation
+# Documentation (but keep blog content)
 docs/
 *.md
 !README.md
+!data/**/*.md
 LICENSE
 
 # CI/CD
