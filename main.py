@@ -109,7 +109,7 @@ async def chat_stream(request: ChatRequest):
         request: Chat request with message and optional thread_id
 
     Returns:
-        Streaming SSE response with AI reply
+        Streaming SSE response with AI reply (compatible with langgraph dev format)
     """
     async def generate() -> AsyncGenerator[str, None]:
         try:
@@ -118,32 +118,37 @@ async def chat_stream(request: ChatRequest):
             if request.thread_id:
                 config["configurable"] = {"thread_id": request.thread_id}
 
-            # Stream the LangGraph agent response
-            async for event in graph.astream_events(
+            # Stream the LangGraph agent response with messages mode
+            async for chunk in graph.astream(
                 {"messages": [{"role": "user", "content": request.message}]},
                 config=config,
-                version="v2"
+                stream_mode="messages"
             ):
-                # Send all events - serialize LangChain objects using repr
+                # chunk is a tuple: (message, metadata)
+                # Format: event: messages/partial
                 try:
-                    # Convert event to dict if it has model_dump method (Pydantic)
-                    if hasattr(event, "model_dump"):
-                        event_data = event.model_dump()
-                    else:
-                        event_data = event
+                    message, _ = chunk
 
-                    event_json = json.dumps(event_data, ensure_ascii=False, default=repr)
-                    yield f"data: {event_json}\n\n"
+                    # Convert message to dict
+                    if hasattr(message, "model_dump"):
+                        message_data = message.model_dump()
+                    elif hasattr(message, "dict"):
+                        message_data = message.dict()
+                    else:
+                        message_data = message
+
+                    # Send in langgraph dev compatible format
+                    chunk_json = json.dumps([message_data], ensure_ascii=False, default=repr)
+                    yield f"event: messages/partial\ndata: {chunk_json}\n\n"
+
                 except Exception as e:
                     # If serialization fails, send error but continue
-                    error_msg = json.dumps({"event": "serialization_error", "error": str(e)}, ensure_ascii=False)
-                    yield f"data: {error_msg}\n\n"
-
-            # Send completion signal
-            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+                    error_msg = json.dumps({"event": "error", "error": str(e)}, ensure_ascii=False)
+                    yield f"event: error\ndata: {error_msg}\n\n"
 
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+            error_msg = json.dumps({"error": str(e)}, ensure_ascii=False)
+            yield f"event: error\ndata: {error_msg}\n\n"
 
     return StreamingResponse(
         generate(),
