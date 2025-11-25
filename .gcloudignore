@@ -1,0 +1,46 @@
+# Git files
+.git
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# LangGraph dev
+.langgraph_api/
+
+# Tests
+tests/
+*.test.py
+pytest.ini
+.pytest_cache/
+
+# Documentation (keep README)
+docs/
+
+# Keep important files
+!Dockerfile
+!main.py
+!pyproject.toml
+!uv.lock
+!.dockerignore
