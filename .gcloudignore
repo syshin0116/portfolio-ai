@@ -3,6 +3,10 @@
 .gitignore
 .github/
 
+# But keep data directory content (even though it has nested .git)
+!data/
+!data/**
+
 # Python
 __pycache__/
 *.py[cod]
