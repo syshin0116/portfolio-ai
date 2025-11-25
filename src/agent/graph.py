@@ -45,5 +45,5 @@ graph = create_deep_agent(
     model=model,
     system_prompt=DEFAULT_SYSTEM_PROMPT,
     tools=[search_blog_summaries, get_blog_content],
-    checkpointer=checkpointer,
+    # checkpointer=checkpointer,
 )
