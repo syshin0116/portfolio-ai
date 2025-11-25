@@ -5,8 +5,10 @@ This wraps the LangGraph agent for production deployment.
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator
+import json
 import os
 from dotenv import load_dotenv
 
@@ -97,6 +99,53 @@ async def chat(request: ChatRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """Streaming chat endpoint.
+
+    Args:
+        request: Chat request with message and optional thread_id
+
+    Returns:
+        Streaming SSE response with AI reply
+    """
+    async def generate() -> AsyncGenerator[str, None]:
+        try:
+            # Prepare config with thread_id if provided
+            config = {}
+            if request.thread_id:
+                config["configurable"] = {"thread_id": request.thread_id}
+
+            # Stream the LangGraph agent response
+            async for event in graph.astream_events(
+                {"messages": [{"role": "user", "content": request.message}]},
+                config=config,
+                version="v2"
+            ):
+                # Filter for LLM token events
+                if event["event"] == "on_chat_model_stream":
+                    content = event["data"]["chunk"].content
+                    if content:
+                        # Send SSE format
+                        yield f"data: {json.dumps({'content': content})}\n\n"
+
+            # Send completion signal
+            yield f"data: {json.dumps({'done': True})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 
 @app.get("/info")
