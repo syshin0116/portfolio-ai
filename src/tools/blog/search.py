@@ -73,19 +73,14 @@ def search_blog_summaries(query: str, max_results: int = 10) -> str:
         url = post.get("url", "")
         tags = ", ".join(str(t) for t in post.get("tags", [])[:5])  # Limit tags
         summary = post.get("summary") or post.get("description", "")
-        image = post.get("image", "")
 
-        # Build formatted post with markdown link
-        formatted_post = f"\n{i}. **[{title}]({url})**\n"
-
-        # Add image if available
-        if image:
-            formatted_post += f"   ![{title}]({image})\n"
-
-        formatted_post += f"   Date: {date}\n"
-        formatted_post += f"   Tags: {tags}\n"
-        formatted_post += f"   Summary: {summary}\n"
-
+        formatted_post = f"""
+{i}. **{title}**
+   URL: {url}
+   Date: {date}
+   Tags: {tags}
+   Summary: {summary}
+"""
         formatted_results.append(formatted_post)
 
     header = f"Found {len(top_results)} relevant posts (showing summaries):\n"
@@ -126,18 +121,19 @@ def get_blog_content(url: str) -> str:
     date = post.get("date", "")
     tags = ", ".join(str(t) for t in post.get("tags", []))
     summary = post.get("summary") or post.get("description", "")
-    image = post.get("image", "")
 
-    # Build formatted post with markdown link and image
-    formatted_post = f"# [{title}]({url})\n\n"
+    formatted_post = f"""
+# {title}
 
-    # Add image if available
-    if image:
-        formatted_post += f"![{title}]({image})\n\n"
+**URL:** {url}
+**Date:** {date}
+**Tags:** {tags}
 
-    formatted_post += f"**Date:** {date}\n"
-    formatted_post += f"**Tags:** {tags}\n\n"
-    formatted_post += f"## Summary\n{summary}\n\n"
-    formatted_post += f"## Full Content\n{content}\n"
+## Summary
+{summary}
+
+## Full Content
+{content}
+"""
 
     return formatted_post
