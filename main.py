@@ -124,8 +124,20 @@ async def chat_stream(request: ChatRequest):
                 config=config,
                 version="v2"
             ):
-                # Send all events (client can filter)
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                # Send all events - serialize LangChain objects using repr
+                try:
+                    # Convert event to dict if it has model_dump method (Pydantic)
+                    if hasattr(event, "model_dump"):
+                        event_data = event.model_dump()
+                    else:
+                        event_data = event
+
+                    event_json = json.dumps(event_data, ensure_ascii=False, default=repr)
+                    yield f"data: {event_json}\n\n"
+                except Exception as e:
+                    # If serialization fails, send error but continue
+                    error_msg = json.dumps({"event": "serialization_error", "error": str(e)}, ensure_ascii=False)
+                    yield f"data: {error_msg}\n\n"
 
             # Send completion signal
             yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
