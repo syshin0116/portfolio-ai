@@ -23,7 +23,7 @@ env/
 *~
 
 # Git (but keep data directory)
-.git/
+.git
 .gitignore
 .gitmodules
 .github/

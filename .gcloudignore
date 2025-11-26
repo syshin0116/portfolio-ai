@@ -1,11 +1,11 @@
-# Git files
+# But keep data directory content FIRST (before git exclusion)
+!data/
+!data/**
+
+# Git files (but data/ is already included above)
 .git
 .gitignore
 .github/
-
-# But keep data directory content (even though it has nested .git)
-!data/
-!data/**
 
 # Python
 __pycache__/
