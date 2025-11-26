@@ -22,11 +22,12 @@ env/
 *.swo
 *~
 
-# Git (but keep data directory and .gitmodules for submodules)
-.git
+# Git (but keep data directory and submodule .git)
+/.git
 .gitignore
 .github/
 !data/
+!data/blog/.git
 
 # LangGraph development
 .langgraph_api/

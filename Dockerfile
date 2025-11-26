@@ -26,19 +26,19 @@ COPY pyproject.toml uv.lock ./
 # Install dependencies
 RUN uv sync --frozen --no-dev --no-install-project
 
-# Copy git config and submodule config
-COPY .gitmodules ./
-
 # Copy application code
 COPY src/ ./src/
 COPY data/ ./data/
 COPY static/ ./static/
 COPY main.py ./
 
-# Pull latest blog content from submodule
-RUN cd data/blog && \
-    git fetch --depth 1 origin main && \
-    git checkout main
+# Pull latest blog content from submodule (if .git exists)
+RUN if [ -d "data/blog/.git" ]; then \
+        cd data/blog && git pull origin main; \
+    else \
+        mkdir -p data && \
+        git clone --depth 1 --branch main https://github.com/syshin0116/syshin0116.github.io.git data/blog; \
+    fi
 
 # Install project
 RUN uv sync --frozen --no-dev
