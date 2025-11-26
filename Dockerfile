@@ -26,11 +26,19 @@ COPY pyproject.toml uv.lock ./
 # Install dependencies
 RUN uv sync --frozen --no-dev --no-install-project
 
+# Copy git config and submodule config
+COPY .gitmodules ./
+
 # Copy application code
 COPY src/ ./src/
 COPY data/ ./data/
 COPY static/ ./static/
 COPY main.py ./
+
+# Pull latest blog content from submodule
+RUN cd data/blog && \
+    git fetch --depth 1 origin main && \
+    git checkout main
 
 # Install project
 RUN uv sync --frozen --no-dev

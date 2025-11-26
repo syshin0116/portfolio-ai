@@ -22,10 +22,9 @@ env/
 *.swo
 *~
 
-# Git (but keep data directory)
+# Git (but keep data directory and .gitmodules for submodules)
 .git
 .gitignore
-.gitmodules
 .github/
 !data/
 
