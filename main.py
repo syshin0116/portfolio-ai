@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 # Import routers
 from src.api.routes import system_router, chat_router, runs_router
 
-logger.info("🚀 Starting Portfolio AI application")
+logger.info("Starting Portfolio AI application")
 
 app = FastAPI(
     title="Portfolio AI",

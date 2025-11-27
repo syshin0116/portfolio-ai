@@ -65,11 +65,11 @@ async def generate_langgraph_stream(
 
                 # Log message content in pretty format
                 if hasattr(message, "content"):
-                    logger.debug(f"📨 Message chunk: {message.content}")
+                    logger.debug(f"Message chunk: {message.content}")
                 elif hasattr(message, "model_dump"):
-                    logger.debug(f"📨 Message chunk: {json.dumps(message.model_dump(), indent=2, ensure_ascii=False)}")
+                    logger.debug(f"Message chunk: {json.dumps(message.model_dump(), indent=2, ensure_ascii=False)}")
                 else:
-                    logger.debug(f"📨 Message chunk: {message}")
+                    logger.debug(f"Message chunk: {message}")
 
                 log_step(logger, "Processing chunk", f"event_counter={event_counter}")
 

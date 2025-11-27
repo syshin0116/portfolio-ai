@@ -46,7 +46,7 @@ def log_request(logger: logging.Logger, endpoint: str, data: Dict[str, Any]) -> 
         endpoint: Endpoint name
         data: Request data
     """
-    logger.info(f"📥 Incoming request to {endpoint}")
+    logger.info(f"Request to {endpoint}")
     logger.debug(f"Request data: {json.dumps(data, indent=2, ensure_ascii=False, default=str)}")
 
 
@@ -71,7 +71,7 @@ def log_step(logger: logging.Logger, step: str, details: str = "") -> None:
         step: Step name
         details: Additional details
     """
-    logger.info(f"🔄 {step}" + (f" - {details}" if details else ""))
+    logger.info(f"{step}" + (f" - {details}" if details else ""))
 
 
 def log_error(logger: logging.Logger, error: Exception, context: str = "") -> None:
@@ -82,5 +82,5 @@ def log_error(logger: logging.Logger, error: Exception, context: str = "") -> No
         error: Exception that occurred
         context: Additional context
     """
-    logger.error(f"❌ Error{' in ' + context if context else ''}: {type(error).__name__}: {str(error)}")
+    logger.error(f"Error{' in ' + context if context else ''}: {type(error).__name__}: {str(error)}")
     logger.debug(f"Stack trace:", exc_info=True)
