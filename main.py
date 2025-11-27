@@ -11,8 +11,15 @@ from fastapi.middleware.cors import CORSMiddleware
 # Load environment variables
 load_dotenv()
 
+# Setup logging
+from src.core.logger import setup_logging, get_logger
+setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = get_logger(__name__)
+
 # Import routers
 from src.api.routes import system_router, chat_router, runs_router
+
+logger.info("🚀 Starting Portfolio AI application")
 
 app = FastAPI(
     title="Portfolio AI",

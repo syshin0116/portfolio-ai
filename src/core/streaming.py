@@ -5,6 +5,10 @@ import uuid
 from datetime import datetime
 from typing import AsyncGenerator, Dict, Any
 
+from src.core.logger import get_logger, log_step, log_error
+
+logger = get_logger(__name__)
+
 
 async def generate_langgraph_stream(
     graph,
@@ -26,10 +30,19 @@ async def generate_langgraph_stream(
         SSE formatted strings
     """
     try:
-        # Generate run_id and thread_id
+        # Generate run_id and get/create thread_id
         run_id = str(uuid.uuid4())
-        thread_id = str(uuid.uuid4())
+        thread_id = config.get("configurable", {}).get("thread_id") or str(uuid.uuid4())
         event_counter = 0
+
+        log_step(logger, "Starting stream", f"run_id={run_id}, thread_id={thread_id}")
+        logger.debug(f"Input: {json.dumps(input_data, ensure_ascii=False, default=str)[:200]}...")
+        logger.debug(f"Config: {json.dumps(config, ensure_ascii=False, default=str)}")
+
+        # Ensure thread_id is in config for checkpointer
+        if "configurable" not in config:
+            config["configurable"] = {}
+        config["configurable"]["thread_id"] = thread_id
 
         # Send metadata event
         metadata = {
@@ -41,6 +54,7 @@ async def generate_langgraph_stream(
         event_counter += 1
 
         # Stream the LangGraph agent response
+        log_step(logger, "Streaming graph output", f"stream_mode={stream_mode}")
         async for chunk in graph.astream(
             input_data,
             config=config,
@@ -48,6 +62,13 @@ async def generate_langgraph_stream(
         ):
             try:
                 message, metadata = chunk
+
+                # Pretty print message if it has the method
+                if hasattr(message, "pretty_print"):
+                    logger.debug("📨 Message chunk:")
+                    message.pretty_print()
+
+                log_step(logger, "Processing chunk", f"event_counter={event_counter}")
 
                 # Send messages/metadata event (first chunk only)
                 if event_counter == 1:
@@ -79,10 +100,14 @@ async def generate_langgraph_stream(
 
             except Exception as e:
                 # If serialization fails, send error but continue
+                log_error(logger, e, "chunk processing")
                 error_msg = json.dumps({"event": "error", "error": str(e)}, ensure_ascii=False)
                 yield f"event: error\ndata: {error_msg}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
                 event_counter += 1
 
+        log_step(logger, "Stream completed", f"total_events={event_counter}")
+
     except Exception as e:
+        log_error(logger, e, "generate_langgraph_stream")
         error_msg = json.dumps({"error": str(e)}, ensure_ascii=False)
         yield f"event: error\ndata: {error_msg}\n\n"
