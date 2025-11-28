@@ -82,18 +82,16 @@ The application is deployed to Google Cloud Run with automatic builds from the `
 - Clone with `--recurse-submodules` or run `git submodule update --init --recursive`
 
 **Cloud Run/Docker:**
-- Cloud Build doesn't support git submodules
-- The Dockerfile automatically clones blog content during build:
+- Docker builds always clone fresh blog content to ensure latest updates
+- The Dockerfile automatically clones during build:
   ```dockerfile
-  RUN if [ -d "data/blog/.git" ]; then \
-          cd data/blog && git pull origin main; \
-      else \
-          mkdir -p data && \
-          git clone --depth 1 --branch main https://github.com/syshin0116/syshin0116.github.io.git data/blog; \
-      fi
+  RUN echo "Cloning blog repository..." && \
+      rm -rf data/blog && \
+      mkdir -p data && \
+      git clone --depth 1 --branch main https://github.com/syshin0116/syshin0116.github.io.git data/blog
   ```
-- This ensures blog content is always included in production deployments
-- Blog is cloned fresh on each Cloud Build (always up-to-date)
+- This ensures every deployment has the latest blog content
+- Uses shallow clone (`--depth 1`) for faster builds
 
 ## API Endpoints
 
