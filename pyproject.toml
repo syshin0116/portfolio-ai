@@ -1,5 +1,5 @@
 [project]
-name = "apphub-ai"
+name = "portfolio-ai"
 version = "0.0.1"
 description = "Starter template for making a new agent LangGraph."
 authors = [

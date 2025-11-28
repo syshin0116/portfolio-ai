@@ -10,6 +10,32 @@ from src.core.logger import get_logger, log_step, log_error
 logger = get_logger(__name__)
 
 
+def format_message_pretty(message) -> str:
+    """Format message object in pretty print style.
+
+    Args:
+        message: LangChain message object
+
+    Returns:
+        Pretty formatted string
+    """
+    if hasattr(message, '__class__'):
+        msg_type = message.__class__.__name__
+    else:
+        msg_type = type(message).__name__
+
+    lines = [f"================================ {msg_type} ================================"]
+
+    if hasattr(message, "content"):
+        lines.append(f"\n{message.content}\n")
+    elif hasattr(message, "model_dump"):
+        lines.append(f"\n{json.dumps(message.model_dump(), indent=2, ensure_ascii=False)}\n")
+    else:
+        lines.append(f"\n{str(message)}\n")
+
+    return "\n".join(lines)
+
+
 async def generate_langgraph_stream(
     graph,
     input_data: Dict[str, Any],
@@ -64,12 +90,7 @@ async def generate_langgraph_stream(
                 message, metadata = chunk
 
                 # Log message content in pretty format
-                if hasattr(message, "content"):
-                    logger.debug(f"Message chunk: {message.content}")
-                elif hasattr(message, "model_dump"):
-                    logger.debug(f"Message chunk: {json.dumps(message.model_dump(), indent=2, ensure_ascii=False)}")
-                else:
-                    logger.debug(f"Message chunk: {message}")
+                logger.debug(format_message_pretty(message))
 
                 log_step(logger, "Processing chunk", f"event_counter={event_counter}")
 
