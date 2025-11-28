@@ -21,18 +21,22 @@ def format_message_pretty(message) -> str:
     Returns:
         Pretty formatted string
     """
-    # If message has pretty_print method, capture its output
+    # Use pretty_repr if available (returns string directly)
+    if hasattr(message, "pretty_repr"):
+        return message.pretty_repr()
+
+    # Fallback: capture pretty_print output if available
     if hasattr(message, "pretty_print"):
         old_stdout = sys.stdout
         sys.stdout = io.StringIO()
         try:
             message.pretty_print()
             output = sys.stdout.getvalue()
-            return output.rstrip()  # Remove trailing newline
+            return output.rstrip()
         finally:
             sys.stdout = old_stdout
 
-    # Fallback to manual formatting
+    # Final fallback to manual formatting
     if hasattr(message, '__class__'):
         msg_type = message.__class__.__name__
     else:
