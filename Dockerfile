@@ -28,15 +28,19 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
 COPY src/ ./src/
-COPY data/ ./data/
 COPY static/ ./static/
 COPY main.py ./
 
-# Always clone fresh blog content for latest updates
+# Always clone fresh blog content for latest updates (content directory only)
 RUN echo "Cloning blog repository..." && \
     rm -rf data/blog && \
-    mkdir -p data && \
-    git clone --depth 1 --branch main https://github.com/syshin0116/syshin0116.github.io.git data/blog
+    mkdir -p data/blog && \
+    cd data/blog && \
+    git init && \
+    git remote add origin https://github.com/syshin0116/syshin0116.github.io.git && \
+    git config core.sparseCheckout true && \
+    echo "content/*" >> .git/info/sparse-checkout && \
+    git pull --depth 1 origin main
 
 # Install project
 RUN uv sync --frozen --no-dev
