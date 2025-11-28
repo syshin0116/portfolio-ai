@@ -1,61 +1,154 @@
-# New LangGraph Project
+# Portfolio AI
 
-[![CI](https://github.com/langchain-ai/new-langgraph-project/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/langchain-ai/new-langgraph-project/actions/workflows/unit-tests.yml)
-[![Integration Tests](https://github.com/langchain-ai/new-langgraph-project/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/langchain-ai/new-langgraph-project/actions/workflows/integration-tests.yml)
+AI assistant for Syshin's portfolio, powered by LangGraph and deployed on Google Cloud Run.
 
-This template demonstrates a simple application implemented using [LangGraph](https://github.com/langchain-ai/langgraph), designed for showing how to get started with [LangGraph Server](https://langchain-ai.github.io/langgraph/concepts/langgraph_server/#langgraph-server) and using [LangGraph Studio](https://langchain-ai.github.io/langgraph/concepts/langgraph_studio/), a visual debugging IDE.
+## Features
 
-<div align="center">
-  <img src="./static/studio_ui.png" alt="Graph view in LangGraph studio UI" width="75%" />
-</div>
-
-The core logic defined in `src/agent/graph.py`, showcases an single-step application that responds with a fixed string and the configuration provided.
-
-You can extend this graph to orchestrate more complex agentic workflows that can be visualized and debugged in LangGraph Studio.
+- **Blog Search**: RAG-based search over 260+ technical blog posts
+- **Two-stage Retrieval**: Efficient summary search → detailed content fetch
+- **LangGraph Server API**: Compatible with `@langchain/langgraph-sdk`
+- **Streaming Support**: Server-Sent Events (SSE) for real-time responses
+- **Supabase Checkpointer**: Persistent conversation memory
+- **Comprehensive Logging**: Step-by-step execution tracking
 
 ## Getting Started
 
-1. Install dependencies, along with the [LangGraph CLI](https://langchain-ai.github.io/langgraph/concepts/langgraph_cli/), which will be used to run the server.
+### 1. Clone with Submodules
+
+This project uses a git submodule for blog content. Clone with:
 
 ```bash
-cd path/to/your/app
-pip install -e . "langgraph-cli[inmem]"
+git clone --recurse-submodules https://github.com/syshin0116/portfolio-ai.git
 ```
 
-2. (Optional) Customize the code and project as needed. Create a `.env` file if you need to use secrets.
+Or if already cloned:
+
+```bash
+git submodule update --init --recursive
+```
+
+### 2. Install Dependencies
+
+Using [uv](https://github.com/astral-sh/uv):
+
+```bash
+uv sync
+```
+
+### 3. Configure Environment
+
+Create a `.env` file:
 
 ```bash
 cp .env.example .env
 ```
 
-If you want to enable LangSmith tracing, add your LangSmith API key to the `.env` file.
+Required environment variables:
 
-```text
-# .env
-LANGSMITH_API_KEY=lsv2...
+```env
+# OpenAI API Key
+OPENAI_API_KEY=sk-...
+
+# Supabase (optional, for checkpointer)
+SUPABASE_CONNECTION_STRING=postgresql://...
+
+# Logging (optional)
+LOG_LEVEL=INFO  # or DEBUG for verbose logging
 ```
 
-3. Start the LangGraph Server.
+### 4. Run Locally
 
-```shell
-langgraph dev
+Using uvicorn:
+
+```bash
+uv run uvicorn main:app --reload
 ```
 
-For more information on getting started with LangGraph Server, [see here](https://langchain-ai.github.io/langgraph/tutorials/langgraph-platform/local-server/).
+Or using Docker:
 
-## How to customize
+```bash
+docker build -t portfolio-ai .
+docker run -p 8080:8080 --env-file .env portfolio-ai
+```
 
-1. **Define runtime context**: Modify the `Context` class in the `graph.py` file to expose the arguments you want to configure per assistant. For example, in a chatbot application you may want to define a dynamic system prompt or LLM to use. For more information on runtime context in LangGraph, [see here](https://langchain-ai.github.io/langgraph/agents/context/?h=context#static-runtime-context).
+## Deployment
 
-2. **Extend the graph**: The core logic of the application is defined in [graph.py](./src/agent/graph.py). You can modify this file to add new nodes, edges, or change the flow of information.
+The application is deployed to Google Cloud Run with automatic builds from the `main` branch.
 
-## Development
+### How Blog Content is Handled
 
-While iterating on your graph in LangGraph Studio, you can edit past state and rerun your app from previous states to debug specific nodes. Local changes will be automatically applied via hot reload.
+**Local Development:**
+- Blog content is managed as a git submodule
+- Clone with `--recurse-submodules` or run `git submodule update --init --recursive`
 
-Follow-up requests extend the same thread. You can create an entirely new thread, clearing previous history, using the `+` button in the top right.
+**Cloud Run/Docker:**
+- Cloud Build doesn't support git submodules
+- The Dockerfile automatically clones blog content during build:
+  ```dockerfile
+  RUN if [ -d "data/blog/.git" ]; then \
+          cd data/blog && git pull origin main; \
+      else \
+          mkdir -p data && \
+          git clone --depth 1 --branch main https://github.com/syshin0116/syshin0116.github.io.git data/blog; \
+      fi
+  ```
+- This ensures blog content is always included in production deployments
+- Blog is cloned fresh on each Cloud Build (always up-to-date)
 
-For more advanced features and examples, refer to the [LangGraph documentation](https://langchain-ai.github.io/langgraph/). These resources can help you adapt this template for your specific use case and build more sophisticated conversational agents.
+## API Endpoints
 
-LangGraph Studio also integrates with [LangSmith](https://smith.langchain.com/) for more in-depth tracing and collaboration with teammates, allowing you to analyze and optimize your chatbot's performance.
+- `GET /` - Health check
+- `GET /info` - System information
+- `POST /runs/stream` - LangGraph Server API compatible streaming endpoint
+
+### Example Usage
+
+```typescript
+import { Client } from "@langchain/langgraph-sdk";
+
+const client = new Client({
+  apiUrl: "https://your-app.run.app"
+});
+
+const stream = client.runs.stream(
+  null, // thread_id (auto-generated if null)
+  "agent", // assistant_id
+  {
+    input: {
+      messages: [{ role: "user", content: "AI에 대해 알려줘" }]
+    },
+    streamMode: "messages"
+  }
+);
+
+for await (const chunk of stream) {
+  console.log(chunk);
+}
+```
+
+## Project Structure
+
+```
+portfolio-ai/
+├── src/
+│   ├── agent/          # LangGraph agent logic
+│   │   ├── graph.py    # Agent graph definition
+│   │   └── prompts.py  # System prompts
+│   ├── api/            # FastAPI endpoints
+│   │   ├── models/     # Pydantic models
+│   │   └── routes/     # API routes
+│   ├── core/           # Core utilities
+│   │   ├── logger.py   # Logging configuration
+│   │   └── streaming.py # SSE streaming
+│   └── tools/          # Agent tools
+│       └── blog/       # Blog search tools
+├── data/
+│   └── blog/           # Blog submodule (260+ posts)
+├── Dockerfile          # Multi-stage Docker build
+└── main.py            # FastAPI application entry point
+```
+
+## License
+
+MIT
 
