@@ -1,6 +1,8 @@
 """Streaming utilities for LangGraph Server API compatibility."""
 
+import io
 import json
+import sys
 import uuid
 from datetime import datetime
 from typing import AsyncGenerator, Dict, Any
@@ -19,6 +21,18 @@ def format_message_pretty(message) -> str:
     Returns:
         Pretty formatted string
     """
+    # If message has pretty_print method, capture its output
+    if hasattr(message, "pretty_print"):
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        try:
+            message.pretty_print()
+            output = sys.stdout.getvalue()
+            return output.rstrip()  # Remove trailing newline
+        finally:
+            sys.stdout = old_stdout
+
+    # Fallback to manual formatting
     if hasattr(message, '__class__'):
         msg_type = message.__class__.__name__
     else:
