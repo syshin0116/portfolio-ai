@@ -1,12 +1,11 @@
 """Streaming utilities for LangGraph Server API compatibility."""
 
-import asyncio
 import io
 import json
 import sys
 import uuid
 from datetime import datetime
-from typing import AsyncGenerator, Dict, Any, List
+from typing import AsyncGenerator, Dict, Any
 
 from src.core.logger import get_logger, log_step, log_error
 
@@ -64,8 +63,12 @@ async def generate_langgraph_stream(
 ) -> AsyncGenerator[str, None]:
     """Generate SSE stream in LangGraph Server API format.
 
+    This uses LangGraph's native streaming with parallel node execution.
+    Multiple DeepAgent nodes can run in parallel and their outputs are
+    streamed as they arrive.
+
     Args:
-        graph: LangGraph compiled graph
+        graph: LangGraph compiled graph (with parallel nodes)
         input_data: Input data for the graph
         config: Configuration for the graph execution
         stream_mode: Stream mode (messages, values, updates, etc.)
@@ -98,7 +101,10 @@ async def generate_langgraph_stream(
         yield f"event: metadata\ndata: {json.dumps(metadata, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
         event_counter += 1
 
-        # Stream the LangGraph agent response
+        # Track which nodes we've seen
+        seen_nodes = set()
+
+        # Stream the LangGraph agent response using native streaming
         log_step(logger, "Streaming graph output", f"stream_mode={stream_mode}")
         async for chunk in graph.astream(
             input_data,
@@ -106,22 +112,31 @@ async def generate_langgraph_stream(
             stream_mode=stream_mode
         ):
             try:
-                message, metadata = chunk
+                message, metadata_chunk = chunk
+
+                # Extract node name from metadata
+                node_name = metadata_chunk.get("langgraph_node", "unknown")
 
                 # Log message content in pretty format
-                logger.debug(format_message_pretty(message))
+                logger.debug(f"[{node_name}] {format_message_pretty(message)}")
 
-                log_step(logger, "Processing chunk", f"event_counter={event_counter}")
+                log_step(logger, "Processing chunk", f"node={node_name}, event_counter={event_counter}")
 
-                # Send messages/metadata event (first chunk only)
-                if event_counter == 1:
+                # Send mode marker when we see a new node
+                if node_name not in seen_nodes and node_name != "unknown":
+                    seen_nodes.add(node_name)
+                    yield f"event: mode\ndata: {json.dumps({'mode': node_name}, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
+                    event_counter += 1
+
+                # Send messages/metadata event (first chunk per node)
+                if node_name not in seen_nodes or len(seen_nodes) == 1:
                     messages_metadata = {
                         f"lc_run--{run_id}": {
                             "metadata": {
                                 "run_id": run_id,
                                 "thread_id": thread_id,
                                 "assistant_id": assistant_id,
-                                "langgraph_node": "model",
+                                "langgraph_node": node_name,
                             }
                         }
                     }
@@ -148,157 +163,9 @@ async def generate_langgraph_stream(
                 yield f"event: error\ndata: {error_msg}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
                 event_counter += 1
 
-        log_step(logger, "Stream completed", f"total_events={event_counter}")
+        log_step(logger, "Stream completed", f"total_events={event_counter}, nodes={len(seen_nodes)}")
 
     except Exception as e:
         log_error(logger, e, "generate_langgraph_stream")
-        error_msg = json.dumps({"error": str(e)}, ensure_ascii=False)
-        yield f"event: error\ndata: {error_msg}\n\n"
-
-
-async def generate_multi_agent_stream(
-    agents: List,
-    rag_modes: List[str],
-    input_data: Dict[str, Any],
-    config: Dict[str, Any],
-    stream_mode: str,
-    assistant_id: str = "agent"
-) -> AsyncGenerator[str, None]:
-    """Generate SSE stream from multiple independent agents running in parallel.
-
-    Each agent processes the same input independently and their results are merged.
-
-    Args:
-        agents: List of LangGraph agents (one per RAG mode)
-        rag_modes: List of RAG mode names
-        input_data: Input data for the graphs
-        config: Configuration for graph execution
-        stream_mode: Stream mode (messages, values, updates, etc.)
-        assistant_id: Assistant ID for metadata
-
-    Yields:
-        SSE formatted strings
-    """
-    try:
-        # Generate run_id and get/create thread_id
-        run_id = str(uuid.uuid4())
-        thread_id = config.get("configurable", {}).get("thread_id") or str(uuid.uuid4())
-        event_counter = 0
-
-        log_step(logger, "Starting multi-agent stream", f"run_id={run_id}, thread_id={thread_id}, agents={len(agents)}")
-        logger.debug(f"RAG modes: {rag_modes}")
-        logger.debug(f"Input: {json.dumps(input_data, ensure_ascii=False, default=str)[:200]}...")
-
-        # Ensure thread_id is in config for checkpointer
-        if "configurable" not in config:
-            config["configurable"] = {}
-        config["configurable"]["thread_id"] = thread_id
-
-        # Send metadata event
-        metadata = {
-            "run_id": run_id,
-            "thread_id": thread_id,
-            "attempt": 1,
-            "rag_modes": rag_modes
-        }
-        yield f"event: metadata\ndata: {json.dumps(metadata, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
-        event_counter += 1
-
-        # Run all agents in parallel and stream results as they arrive
-        async def stream_agent(agent, mode_name):
-            """Stream a single agent's output in real-time."""
-            nonlocal event_counter
-
-            # Send mode marker
-            yield f"event: mode\ndata: {json.dumps({'mode': mode_name}, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
-            event_counter += 1
-
-            first_chunk = True
-            async for chunk in agent.astream(input_data, config=config, stream_mode=stream_mode):
-                try:
-                    message, metadata = chunk
-
-                    # Log message content
-                    logger.debug(format_message_pretty(message))
-
-                    # Send messages/metadata event (first chunk only per mode)
-                    if first_chunk:
-                        messages_metadata = {
-                            f"lc_run--{run_id}": {
-                                "metadata": {
-                                    "run_id": run_id,
-                                    "thread_id": thread_id,
-                                    "assistant_id": assistant_id,
-                                    "langgraph_node": "model",
-                                    "rag_mode": mode_name
-                                }
-                            }
-                        }
-                        yield f"event: messages/metadata\ndata: {json.dumps(messages_metadata, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
-                        event_counter += 1
-                        first_chunk = False
-
-                    # Convert message to dict
-                    if hasattr(message, "model_dump"):
-                        message_data = message.model_dump()
-                    elif hasattr(message, "dict"):
-                        message_data = message.dict()
-                    else:
-                        message_data = message
-
-                    # Send messages/partial event
-                    chunk_json = json.dumps([message_data], ensure_ascii=False, default=repr)
-                    yield f"event: messages/partial\ndata: {chunk_json}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
-                    event_counter += 1
-
-                except Exception as e:
-                    log_error(logger, e, f"chunk processing for {mode_name}")
-                    error_msg = json.dumps({"event": "error", "error": str(e), "mode": mode_name}, ensure_ascii=False)
-                    yield f"event: error\ndata: {error_msg}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
-                    event_counter += 1
-
-        # Execute agents in parallel and merge their streams
-        log_step(logger, "Executing agents in parallel", f"count={len(agents)}")
-
-        # Create async generators for each agent
-        agent_streams = [stream_agent(agent, mode) for agent, mode in zip(agents, rag_modes)]
-
-        # Merge streams - yield from each as chunks arrive
-        pending_streams = {idx: stream for idx, stream in enumerate(agent_streams)}
-
-        while pending_streams:
-            # Create tasks to get next item from each stream
-            tasks = {idx: asyncio.create_task(stream.__anext__())
-                    for idx, stream in pending_streams.items()}
-
-            if not tasks:
-                break
-
-            # Wait for first completion
-            done, pending = await asyncio.wait(
-                tasks.values(),
-                return_when=asyncio.FIRST_COMPLETED
-            )
-
-            # Process completed tasks
-            for task in done:
-                # Find which stream this task belongs to
-                stream_idx = next(idx for idx, t in tasks.items() if t == task)
-
-                try:
-                    chunk = await task
-                    yield chunk
-                except StopAsyncIteration:
-                    # Stream is exhausted, remove it
-                    del pending_streams[stream_idx]
-                    log_step(logger, f"Agent stream {stream_idx} completed", "")
-                except Exception as e:
-                    log_error(logger, e, f"stream {stream_idx}")
-                    del pending_streams[stream_idx]
-
-        log_step(logger, "Multi-agent stream completed", f"total_events={event_counter}")
-
-    except Exception as e:
-        log_error(logger, e, "generate_multi_agent_stream")
         error_msg = json.dumps({"error": str(e)}, ensure_ascii=False)
         yield f"event: error\ndata: {error_msg}\n\n"

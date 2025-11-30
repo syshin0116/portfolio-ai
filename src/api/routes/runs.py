@@ -4,8 +4,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from src.api.models import RunsStreamRequest, RagMode
-from src.agent.graph import get_agent
-from src.core.streaming import generate_multi_agent_stream
+from src.agent.graph import create_multi_rag_graph
+from src.core.streaming import generate_langgraph_stream
 from src.core.logger import get_logger, log_request, log_response
 
 router = APIRouter()
@@ -14,13 +14,18 @@ logger = get_logger(__name__)
 
 @router.post("/runs/stream")
 async def runs_stream(request: RunsStreamRequest):
-    """LangGraph Server API compatible runs/stream endpoint (stateless).
+    """LangGraph Server API compatible runs/stream endpoint.
 
-    This endpoint mimics the LangGraph Server API format, allowing clients
-    to use @langchain/langgraph-sdk directly.
+    This endpoint creates a dynamic graph with parallel DeepAgent nodes
+    based on the selected RAG modes. Each RAG mode runs as an independent
+    DeepAgent in parallel, with results streamed as they arrive.
+
+    Architecture:
+        START → [metadata_search, filesystem_search, ...] → END
+                     (parallel DeepAgents)
 
     Args:
-        request: Run request with assistant_id, input, config, stream_mode
+        request: Run request with assistant_id, input, config, stream_mode, rag_modes
 
     Returns:
         SSE stream compatible with LangGraph Server API format
@@ -39,18 +44,17 @@ async def runs_stream(request: RunsStreamRequest):
     rag_modes = request.rag_modes if request.rag_modes else [RagMode.METADATA_SEARCH]
     rag_mode_values = [mode.value for mode in rag_modes]
 
-    # Get independent agents for each RAG mode
-    agents = [get_agent(mode) for mode in rag_mode_values]
+    # Create a single graph with parallel DeepAgent nodes for selected RAG modes
+    graph = create_multi_rag_graph(rag_mode_values)
 
-    # Add rag_modes to config
+    # Store rag_modes in config for reference (optional, not used by graph)
     if "configurable" not in config:
         config["configurable"] = {}
     config["configurable"]["rag_modes"] = rag_mode_values
 
     response = StreamingResponse(
-        generate_multi_agent_stream(
-            agents=agents,
-            rag_modes=rag_mode_values,
+        generate_langgraph_stream(
+            graph=graph,
             input_data=request.input,
             config=config,
             stream_mode=request.stream_mode,
