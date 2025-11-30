@@ -105,17 +105,26 @@ async def generate_langgraph_stream(
         seen_nodes = set()
 
         # Stream the LangGraph agent response using native streaming
-        log_step(logger, "Streaming graph output", f"stream_mode={stream_mode}")
+        # subgraphs=True enables streaming from DeepAgents inside nodes
+        log_step(logger, "Streaming graph output", f"stream_mode={stream_mode}, subgraphs=True")
         async for chunk in graph.astream(
             input_data,
             config=config,
-            stream_mode=stream_mode
+            stream_mode=stream_mode,
+            subgraphs=True
         ):
             try:
-                message, metadata_chunk = chunk
+                # With subgraphs=True, chunk format is (namespace, data)
+                # namespace is a tuple like () for parent or ('node_name:id',) for subgraph
+                namespace, data = chunk
 
-                # Extract node name from metadata
-                node_name = metadata_chunk.get("langgraph_node", "unknown")
+                # Data can be either (message, metadata) tuple or a dict
+                if isinstance(data, tuple) and len(data) == 2:
+                    message, metadata_chunk = data
+                    node_name = metadata_chunk.get("langgraph_node", "unknown")
+                else:
+                    # Skip non-message chunks
+                    continue
 
                 # Log message content in pretty format
                 logger.debug(f"[{node_name}] {format_message_pretty(message)}")

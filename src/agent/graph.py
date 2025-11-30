@@ -123,10 +123,10 @@ def create_multi_rag_graph(rag_modes: List[str]):
     # Create state graph with simple orchestration state
     graph_builder = StateGraph(MultiRagState)
 
-    # Add a node for each RAG mode
+    # Add DeepAgent as a node for each RAG mode
     for rag_mode in rag_modes:
-        node_fn = create_rag_node(rag_mode)
-        graph_builder.add_node(rag_mode, node_fn)
+        deep_agent = get_deep_agent(rag_mode)
+        graph_builder.add_node(rag_mode, deep_agent)
 
     # Connect START to all RAG mode nodes (parallel execution)
     for rag_mode in rag_modes:
