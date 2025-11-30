@@ -1,10 +1,8 @@
 """API models."""
 
-from .chat import ChatRequest, ChatResponse
-from .runs import RunsStreamRequest
+from .runs import RunsStreamRequest, RagMode
 
 __all__ = [
-    "ChatRequest",
-    "ChatResponse",
     "RunsStreamRequest",
+    "RagMode",
 ]

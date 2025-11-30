@@ -1,22 +1,17 @@
-"""LangGraph single-node graph template.
-
-Returns a predefined response. Replace logic and configuration as needed.
-"""
+"""LangGraph agents with isolated RAG modes."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict
+import os
+from typing import Dict
 
-from langgraph.graph import StateGraph
-from langgraph.runtime import Runtime
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from typing_extensions import TypedDict
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from typing_extensions import TypedDict
+
 from src.agent.prompts import DEFAULT_SYSTEM_PROMPT
-from src.tools.blog import search_blog_summaries, get_blog_content
-import os
+from src.tools.rag import load_rag_tools
 
 
 class Context(TypedDict):
@@ -41,9 +36,37 @@ if os.getenv("SUPABASE_CONNECTION_STRING"):
     )
     # Note: AsyncPostgresSaver.setup() will be called automatically on first use
 
-graph = create_deep_agent(
-    model=model,
-    system_prompt=DEFAULT_SYSTEM_PROMPT,
-    tools=[search_blog_summaries, get_blog_content],
-    # checkpointer=checkpointer,
-)
+
+# Create independent DeepAgent for each RAG mode
+_agents: Dict[str, any] = {}
+
+
+def get_agent(rag_mode: str):
+    """Get or create an isolated DeepAgent for a specific RAG mode.
+
+    Each RAG mode has its own independent agent with dedicated tools.
+    This ensures complete isolation between different search strategies.
+
+    Args:
+        rag_mode: RAG mode name (e.g., "metadata_search", "filesystem_search")
+
+    Returns:
+        Compiled LangGraph DeepAgent
+    """
+    if rag_mode not in _agents:
+        # Load tools specific to this RAG mode
+        tools = load_rag_tools([rag_mode])
+
+        # Create isolated agent
+        _agents[rag_mode] = create_deep_agent(
+            model=model,
+            system_prompt=DEFAULT_SYSTEM_PROMPT,
+            tools=tools,
+            # checkpointer=checkpointer,
+        )
+
+    return _agents[rag_mode]
+
+
+# Default graph for backward compatibility (metadata_search)
+graph = get_agent("metadata_search")

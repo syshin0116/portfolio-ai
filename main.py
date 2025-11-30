@@ -17,7 +17,7 @@ setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
 
 # Import routers
-from src.api.routes import system_router, chat_router, runs_router
+from src.api.routes import system_router, runs_router
 
 logger.info("Starting Portfolio AI application")
 
@@ -38,7 +38,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(system_router, tags=["System"])
-app.include_router(chat_router, tags=["Chat"])
 app.include_router(runs_router, tags=["Runs"])
 
 

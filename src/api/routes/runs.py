@@ -3,9 +3,9 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from src.api.models import RunsStreamRequest
-from src.agent.graph import graph
-from src.core.streaming import generate_langgraph_stream
+from src.api.models import RunsStreamRequest, RagMode
+from src.agent.graph import get_agent
+from src.core.streaming import generate_multi_agent_stream
 from src.core.logger import get_logger, log_request, log_response
 
 router = APIRouter()
@@ -29,14 +29,28 @@ async def runs_stream(request: RunsStreamRequest):
         "assistant_id": request.assistant_id,
         "input": request.input,
         "config": request.config,
-        "stream_mode": request.stream_mode
+        "stream_mode": request.stream_mode,
+        "rag_modes": request.rag_modes
     })
 
     config = request.config or {}
 
+    # Set default rag_modes if not provided
+    rag_modes = request.rag_modes if request.rag_modes else [RagMode.METADATA_SEARCH]
+    rag_mode_values = [mode.value for mode in rag_modes]
+
+    # Get independent agents for each RAG mode
+    agents = [get_agent(mode) for mode in rag_mode_values]
+
+    # Add rag_modes to config
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["rag_modes"] = rag_mode_values
+
     response = StreamingResponse(
-        generate_langgraph_stream(
-            graph=graph,
+        generate_multi_agent_stream(
+            agents=agents,
+            rag_modes=rag_mode_values,
             input_data=request.input,
             config=config,
             stream_mode=request.stream_mode,
