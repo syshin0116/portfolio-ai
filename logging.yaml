@@ -20,7 +20,7 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: INFO
+    level: DEBUG
     formatter: colored
     stream: ext://sys.stdout
 
@@ -39,9 +39,9 @@ loggers:
     handlers: [console, file]
     propagate: false
 
-  # Streaming is too verbose - only log errors
+  # Streaming - only show important events (not per-token chunks)
   src.core.streaming:
-    level: ERROR
+    level: INFO
     handlers: [console]
     propagate: false
 

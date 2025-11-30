@@ -37,17 +37,21 @@ def format_message_pretty(message) -> str:
             sys.stdout = old_stdout
 
     # Final fallback to manual formatting
-    if hasattr(message, '__class__'):
+    if hasattr(message, "__class__"):
         msg_type = message.__class__.__name__
     else:
         msg_type = type(message).__name__
 
-    lines = [f"================================ {msg_type} ================================"]
+    lines = [
+        f"================================ {msg_type} ================================"
+    ]
 
     if hasattr(message, "content"):
         lines.append(f"\n{message.content}\n")
     elif hasattr(message, "model_dump"):
-        lines.append(f"\n{json.dumps(message.model_dump(), indent=2, ensure_ascii=False)}\n")
+        lines.append(
+            f"\n{json.dumps(message.model_dump(), indent=2, ensure_ascii=False)}\n"
+        )
     else:
         lines.append(f"\n{str(message)}\n")
 
@@ -59,7 +63,7 @@ async def generate_langgraph_stream(
     input_data: Dict[str, Any],
     config: Dict[str, Any],
     stream_mode: str,
-    assistant_id: str = "agent"
+    assistant_id: str = "agent",
 ) -> AsyncGenerator[str, None]:
     """Generate SSE stream in LangGraph Server API format.
 
@@ -84,7 +88,9 @@ async def generate_langgraph_stream(
         event_counter = 0
 
         log_step(logger, "Starting stream", f"run_id={run_id}, thread_id={thread_id}")
-        logger.debug(f"Input: {json.dumps(input_data, ensure_ascii=False, default=str)[:200]}...")
+        logger.debug(
+            f"Input: {json.dumps(input_data, ensure_ascii=False, default=str)[:200]}..."
+        )
         logger.debug(f"Config: {json.dumps(config, ensure_ascii=False, default=str)}")
 
         # Ensure thread_id is in config for checkpointer
@@ -93,11 +99,7 @@ async def generate_langgraph_stream(
         config["configurable"]["thread_id"] = thread_id
 
         # Send metadata event
-        metadata = {
-            "run_id": run_id,
-            "thread_id": thread_id,
-            "attempt": 1
-        }
+        metadata = {"run_id": run_id, "thread_id": thread_id, "attempt": 1}
         yield f"event: metadata\ndata: {json.dumps(metadata, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
         event_counter += 1
 
@@ -106,12 +108,38 @@ async def generate_langgraph_stream(
 
         # Stream the LangGraph agent response using native streaming
         # subgraphs=True enables streaming from DeepAgents inside nodes
-        log_step(logger, "Streaming graph output", f"stream_mode={stream_mode}, subgraphs=True")
+        log_step(
+            logger,
+            "Streaming graph output",
+            f"stream_mode={stream_mode}, subgraphs=True",
+        )
+
+        # Run parallel stream for logging (updates mode shows complete messages)
+        import asyncio
+
+        async def log_updates():
+            """Background task to log complete node outputs using updates stream"""
+            try:
+                async for update in graph.astream(
+                    input_data, config=config, stream_mode="updates", subgraphs=True
+                ):
+                    _, data = update
+                    # updates returns {node_name: state_update}
+                    for node_key, node_data in data.items():
+                        if isinstance(node_data, dict) and "messages" in node_data:
+                            messages = node_data["messages"]
+                            if messages:
+                                # Log the last (complete) message from this node
+                                last_msg = messages[-1] if isinstance(messages, list) else messages
+                                logger.info(f"[{node_key}]\n{format_message_pretty(last_msg)}")
+            except Exception as e:
+                log_error(logger, e, "log_updates background task")
+
+        # Start logging in background
+        log_task = asyncio.create_task(log_updates())
+
         async for chunk in graph.astream(
-            input_data,
-            config=config,
-            stream_mode=stream_mode,
-            subgraphs=True
+            input_data, config=config, stream_mode=stream_mode, subgraphs=True
         ):
             try:
                 # With subgraphs=True, chunk format is (namespace, data)
@@ -134,10 +162,6 @@ async def generate_langgraph_stream(
                 else:
                     # Skip non-message chunks
                     continue
-
-                # Log message content in pretty format (debug only)
-                if logger.isEnabledFor(10):  # DEBUG level
-                    logger.debug(f"[{node_name}] {format_message_pretty(message)}")
 
                 # Send mode marker when we see a new node
                 if node_name not in seen_nodes and node_name != "unknown":
@@ -169,18 +193,32 @@ async def generate_langgraph_stream(
                     message_data = message
 
                 # Send messages/partial event
-                chunk_json = json.dumps([message_data], ensure_ascii=False, default=repr)
+                chunk_json = json.dumps(
+                    [message_data], ensure_ascii=False, default=repr
+                )
                 yield f"event: messages/partial\ndata: {chunk_json}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
                 event_counter += 1
 
             except Exception as e:
                 # If serialization fails, send error but continue
                 log_error(logger, e, "chunk processing")
-                error_msg = json.dumps({"event": "error", "error": str(e)}, ensure_ascii=False)
+                error_msg = json.dumps(
+                    {"event": "error", "error": str(e)}, ensure_ascii=False
+                )
                 yield f"event: error\ndata: {error_msg}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
                 event_counter += 1
 
-        log_step(logger, "Stream completed", f"total_events={event_counter}, nodes={len(seen_nodes)}")
+        # Wait for logging task to complete
+        try:
+            await log_task
+        except Exception as e:
+            log_error(logger, e, "waiting for log_task")
+
+        log_step(
+            logger,
+            "Stream completed",
+            f"total_events={event_counter}, nodes={len(seen_nodes)}",
+        )
 
     except Exception as e:
         log_error(logger, e, "generate_langgraph_stream")
