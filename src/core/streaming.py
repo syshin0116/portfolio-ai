@@ -204,28 +204,17 @@ async def generate_multi_agent_stream(
         yield f"event: metadata\ndata: {json.dumps(metadata, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
         event_counter += 1
 
-        # Run all agents in parallel
-        async def run_agent(agent, mode_name):
-            """Run a single agent and collect its output."""
-            result_chunks = []
-            async for chunk in agent.astream(input_data, config=config, stream_mode=stream_mode):
-                result_chunks.append(chunk)
-            return mode_name, result_chunks
+        # Run all agents in parallel and stream results as they arrive
+        async def stream_agent(agent, mode_name):
+            """Stream a single agent's output in real-time."""
+            nonlocal event_counter
 
-        # Execute agents in parallel
-        log_step(logger, "Executing agents in parallel", f"count={len(agents)}")
-        tasks = [run_agent(agent, mode) for agent, mode in zip(agents, rag_modes)]
-        agent_results = await asyncio.gather(*tasks)
-
-        # Stream results from all agents
-        for mode_name, chunks in agent_results:
-            log_step(logger, f"Streaming results from {mode_name}", f"chunks={len(chunks)}")
-            
             # Send mode marker
             yield f"event: mode\ndata: {json.dumps({'mode': mode_name}, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
             event_counter += 1
 
-            for chunk in chunks:
+            first_chunk = True
+            async for chunk in agent.astream(input_data, config=config, stream_mode=stream_mode):
                 try:
                     message, metadata = chunk
 
@@ -233,7 +222,7 @@ async def generate_multi_agent_stream(
                     logger.debug(format_message_pretty(message))
 
                     # Send messages/metadata event (first chunk only per mode)
-                    if event_counter == 2:  # After metadata and first mode marker
+                    if first_chunk:
                         messages_metadata = {
                             f"lc_run--{run_id}": {
                                 "metadata": {
@@ -247,6 +236,7 @@ async def generate_multi_agent_stream(
                         }
                         yield f"event: messages/metadata\ndata: {json.dumps(messages_metadata, ensure_ascii=False)}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
                         event_counter += 1
+                        first_chunk = False
 
                     # Convert message to dict
                     if hasattr(message, "model_dump"):
@@ -266,6 +256,45 @@ async def generate_multi_agent_stream(
                     error_msg = json.dumps({"event": "error", "error": str(e), "mode": mode_name}, ensure_ascii=False)
                     yield f"event: error\ndata: {error_msg}\nid: {int(datetime.now().timestamp() * 1000)}-{event_counter}\n\n"
                     event_counter += 1
+
+        # Execute agents in parallel and merge their streams
+        log_step(logger, "Executing agents in parallel", f"count={len(agents)}")
+
+        # Create async generators for each agent
+        agent_streams = [stream_agent(agent, mode) for agent, mode in zip(agents, rag_modes)]
+
+        # Merge streams - yield from each as chunks arrive
+        pending_streams = {idx: stream for idx, stream in enumerate(agent_streams)}
+
+        while pending_streams:
+            # Create tasks to get next item from each stream
+            tasks = {idx: asyncio.create_task(stream.__anext__())
+                    for idx, stream in pending_streams.items()}
+
+            if not tasks:
+                break
+
+            # Wait for first completion
+            done, pending = await asyncio.wait(
+                tasks.values(),
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # Process completed tasks
+            for task in done:
+                # Find which stream this task belongs to
+                stream_idx = next(idx for idx, t in tasks.items() if t == task)
+
+                try:
+                    chunk = await task
+                    yield chunk
+                except StopAsyncIteration:
+                    # Stream is exhausted, remove it
+                    del pending_streams[stream_idx]
+                    log_step(logger, f"Agent stream {stream_idx} completed", "")
+                except Exception as e:
+                    log_error(logger, e, f"stream {stream_idx}")
+                    del pending_streams[stream_idx]
 
         log_step(logger, "Multi-agent stream completed", f"total_events={event_counter}")
 
