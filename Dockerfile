@@ -30,6 +30,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src/ ./src/
 COPY static/ ./static/
 COPY main.py ./
+COPY logging.yaml ./
 
 # Always clone fresh blog content for latest updates (content directory only)
 RUN echo "Cloning blog repository..." && \
@@ -56,8 +57,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH"
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Create non-root user and logs directory
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/logs && \
+    chown -R appuser:appuser /app
 
 # Copy virtual environment from builder
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
@@ -67,6 +70,7 @@ COPY --from=builder --chown=appuser:appuser /app/src /app/src
 COPY --from=builder --chown=appuser:appuser /app/data /app/data
 COPY --from=builder --chown=appuser:appuser /app/static /app/static
 COPY --from=builder --chown=appuser:appuser /app/main.py /app/main.py
+COPY --from=builder --chown=appuser:appuser /app/logging.yaml /app/logging.yaml
 
 # Switch to non-root user
 USER appuser

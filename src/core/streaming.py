@@ -135,10 +135,9 @@ async def generate_langgraph_stream(
                     # Skip non-message chunks
                     continue
 
-                # Log message content in pretty format
-                logger.debug(f"[{node_name}] {format_message_pretty(message)}")
-
-                log_step(logger, "Processing chunk", f"node={node_name}, event_counter={event_counter}")
+                # Log message content in pretty format (debug only)
+                if logger.isEnabledFor(10):  # DEBUG level
+                    logger.debug(f"[{node_name}] {format_message_pretty(message)}")
 
                 # Send mode marker when we see a new node
                 if node_name not in seen_nodes and node_name != "unknown":

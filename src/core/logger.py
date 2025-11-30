@@ -1,21 +1,41 @@
 """Logging configuration for the application."""
 
 import logging
+import logging.config
 import sys
+from pathlib import Path
 from typing import Any, Dict
 import json
+import yaml
 
 # Configure logging format
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-def setup_logging(level: str = "INFO") -> None:
-    """Setup logging configuration.
+def setup_logging(level: str = "INFO", config_file: str = "logging.yaml") -> None:
+    """Setup logging configuration from YAML file or fallback to basic config.
 
     Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) - used if config_file not found
+        config_file: Path to YAML logging configuration file
     """
+    config_path = Path(config_file)
+
+    if config_path.exists():
+        try:
+            # Create logs directory if it doesn't exist
+            Path("logs").mkdir(exist_ok=True)
+
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+                logging.config.dictConfig(config)
+            return
+        except Exception as e:
+            print(f"Warning: Failed to load logging config from {config_file}: {e}")
+            print("Falling back to basic logging configuration")
+
+    # Fallback to basic configuration
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format=LOG_FORMAT,

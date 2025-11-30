@@ -164,3 +164,8 @@ cython_debug/
 
 # Blog repository git metadata (we track content, not the nested .git)
 data/blog/.git/
+
+# Application logs
+logs/
+*.log
+

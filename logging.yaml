@@ -1,0 +1,68 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  colored:
+    (): colorlog.ColoredFormatter
+    format: "%(log_color)s%(asctime)s | %(levelname)-8s%(reset)s | %(cyan)s%(name)s%(reset)s | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+    log_colors:
+      DEBUG: cyan
+      INFO: green
+      WARNING: yellow
+      ERROR: red
+      CRITICAL: bold_red
+
+  detailed:
+    format: "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(funcName)s | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: colored
+    stream: ext://sys.stdout
+
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: INFO
+    formatter: detailed
+    filename: logs/app.log
+    maxBytes: 10485760  # 10MB
+    backupCount: 3
+
+loggers:
+  # Application loggers
+  src:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+
+  # Streaming is too verbose - only log errors
+  src.core.streaming:
+    level: ERROR
+    handlers: [console]
+    propagate: false
+
+  # API requests
+  src.api:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+
+  # External libraries - reduce noise
+  httpx:
+    level: WARNING
+  httpcore:
+    level: WARNING
+  langchain:
+    level: WARNING
+  langgraph:
+    level: WARNING
+  openai:
+    level: WARNING
+
+root:
+  level: INFO
+  handlers: [console]
