@@ -118,10 +118,19 @@ async def generate_langgraph_stream(
                 # namespace is a tuple like () for parent or ('node_name:id',) for subgraph
                 namespace, data = chunk
 
+                # Extract node name from namespace if available
+                if namespace and len(namespace) > 0:
+                    # namespace[0] is like "metadata_search:abc123"
+                    node_name = namespace[0].split(":")[0]
+                else:
+                    node_name = "root"
+
                 # Data can be either (message, metadata) tuple or a dict
                 if isinstance(data, tuple) and len(data) == 2:
                     message, metadata_chunk = data
-                    node_name = metadata_chunk.get("langgraph_node", "unknown")
+                    # Override with namespace node name if different
+                    if node_name != "root":
+                        metadata_chunk["langgraph_node"] = node_name
                 else:
                     # Skip non-message chunks
                     continue
