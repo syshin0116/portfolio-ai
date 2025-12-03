@@ -59,6 +59,9 @@ def get_blog_url(file_path: str | Path) -> str:
     if url_path.endswith(".md"):
         url_path = url_path[:-3]
 
+    # Replace spaces with hyphens for Jekyll/GitHub Pages URL format
+    url_path = url_path.replace(" ", "-")
+
     return f"https://syshin0116.github.io/{url_path}"
 
 

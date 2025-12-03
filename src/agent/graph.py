@@ -6,6 +6,7 @@ import os
 from typing import Dict, List, Annotated
 
 from deepagents import create_deep_agent
+from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import StateGraph, START, END
@@ -44,75 +45,56 @@ if os.getenv("SUPABASE_CONNECTION_STRING"):
     # Note: AsyncPostgresSaver.setup() will be called automatically on first use
 
 
-# Cache for DeepAgent instances per RAG mode
-_deep_agents: Dict[str, any] = {}
+# Cache for agent instances per RAG mode
+_agents: Dict[str, any] = {}
 
 
-def get_deep_agent(rag_mode: str):
-    """Get or create a DeepAgent for a specific RAG mode.
+def get_agent_for_rag_mode(rag_mode: str):
+    """Get or create an agent for a specific RAG mode.
 
-    Each RAG mode has its own independent DeepAgent with dedicated tools.
-    DeepAgents internally use the default AgentState.
+    metadata_search uses a simple agent (fast, no subgraph overhead).
+    Other RAG modes use DeepAgent (for complex multi-step reasoning).
 
     Args:
         rag_mode: RAG mode name (e.g., "metadata_search", "filesystem_search")
 
     Returns:
-        Compiled LangGraph DeepAgent
+        Compiled LangGraph agent (either simple agent or DeepAgent)
     """
-    if rag_mode not in _deep_agents:
+    if rag_mode not in _agents:
         # Load tools specific to this RAG mode
         tools = load_rag_tools([rag_mode])
 
-        # Create isolated DeepAgent (uses default AgentState internally)
-        _deep_agents[rag_mode] = create_deep_agent(
-            model=model,
-            system_prompt=DEFAULT_SYSTEM_PROMPT,
-            tools=tools,
-            # checkpointer=checkpointer,  # Disabled for now
-        )
+        if rag_mode == "metadata_search":
+            # Simple agent for metadata search (no deep reasoning needed)
+            _agents[rag_mode] = create_agent(
+                model=model,
+                tools=tools,
+            )
+        else:
+            # DeepAgent for complex RAG modes (vector, graph, filesystem, etc.)
+            _agents[rag_mode] = create_deep_agent(
+                model=model,
+                system_prompt=DEFAULT_SYSTEM_PROMPT,
+                tools=tools,
+                # checkpointer=checkpointer,  # Disabled for now
+            )
 
-    return _deep_agents[rag_mode]
-
-
-def create_rag_node(rag_mode: str):
-    """Create a node function for a specific RAG mode.
-
-    This wraps a DeepAgent in a node function that can be added to the StateGraph.
-
-    Args:
-        rag_mode: RAG mode name
-
-    Returns:
-        Async node function
-    """
-    async def node_fn(state: MultiRagState, config):
-        """Execute the DeepAgent for this RAG mode."""
-        deep_agent = get_deep_agent(rag_mode)
-
-        # DeepAgent uses AgentState internally, we just pass messages
-        result = await deep_agent.ainvoke(
-            {"messages": state["messages"]},
-            config=config
-        )
-
-        # Return messages from the DeepAgent
-        return {"messages": result["messages"]}
-
-    # Set a descriptive name for debugging
-    node_fn.__name__ = f"rag_node_{rag_mode}"
-    return node_fn
+    return _agents[rag_mode]
 
 
 def create_multi_rag_graph(rag_modes: List[str]):
-    """Create a StateGraph with parallel DeepAgent nodes for selected RAG modes.
+    """Create a StateGraph with parallel agent nodes for selected RAG modes.
 
-    Each RAG mode runs as an independent DeepAgent node in parallel.
+    Each RAG mode runs as an independent agent node in parallel:
+    - metadata_search: simple agent (fast, lightweight)
+    - others: DeepAgent (complex reasoning with tool calling)
+
     Results are automatically merged by LangGraph's state management.
 
     Architecture:
-        START → [rag_node_1, rag_node_2, ...] → END
-                     (parallel DeepAgents)
+        START → [agent_1, agent_2, ...] → END
+                  (parallel agents)
 
     Args:
         rag_modes: List of RAG mode names to activate (from config)
@@ -123,10 +105,10 @@ def create_multi_rag_graph(rag_modes: List[str]):
     # Create state graph with simple orchestration state
     graph_builder = StateGraph(MultiRagState)
 
-    # Add DeepAgent as a node for each RAG mode
+    # Add agent as a node for each RAG mode
     for rag_mode in rag_modes:
-        deep_agent = get_deep_agent(rag_mode)
-        graph_builder.add_node(rag_mode, deep_agent)
+        agent = get_agent_for_rag_mode(rag_mode)
+        graph_builder.add_node(rag_mode, agent)
 
     # Connect START to all RAG mode nodes (parallel execution)
     for rag_mode in rag_modes:

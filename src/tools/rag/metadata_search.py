@@ -69,7 +69,7 @@ def search_blog_metadata(query: str, max_results: int = 10) -> str:
         summary = post.get("summary") or post.get("description", "")
 
         formatted_post = f"""
-{i}. **{title}**
+{i}. Title: {title}
    URL: {url}
    Date: {date}
    Tags: {tags}
