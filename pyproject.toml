@@ -62,6 +62,8 @@ lint.ignore = [
 ]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D", "UP"]
+"main.py" = ["E402"]  # Module imports after load_dotenv() is intentional
+"src/core/logger.py" = ["T201"]  # print to stderr before logging is configured
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 

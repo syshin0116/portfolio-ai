@@ -5,9 +5,9 @@ import json
 import sys
 import uuid
 from datetime import datetime
-from typing import AsyncGenerator, Dict, Any
+from typing import Any, AsyncGenerator, Dict
 
-from src.core.logger import get_logger, log_step, log_error
+from src.core.logger import get_logger, log_error, log_step
 
 logger = get_logger(__name__)
 
@@ -64,7 +64,7 @@ async def generate_langgraph_stream(
     config: Dict[str, Any],
     stream_mode: str,
     assistant_id: str = "agent",
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     """Generate SSE stream in LangGraph Server API format.
 
     This uses LangGraph's native streaming with parallel node execution.
@@ -118,7 +118,7 @@ async def generate_langgraph_stream(
         import asyncio
 
         async def log_updates():
-            """Background task to log complete node outputs using updates stream"""
+            """Background task to log complete node outputs using updates stream."""
             try:
                 async for update in graph.astream(
                     input_data, config=config, stream_mode="updates", subgraphs=True
@@ -130,8 +130,14 @@ async def generate_langgraph_stream(
                             messages = node_data["messages"]
                             if messages:
                                 # Log the last (complete) message from this node
-                                last_msg = messages[-1] if isinstance(messages, list) else messages
-                                logger.info(f"[{node_key}]\n{format_message_pretty(last_msg)}")
+                                last_msg = (
+                                    messages[-1]
+                                    if isinstance(messages, list)
+                                    else messages
+                                )
+                                logger.info(
+                                    f"[{node_key}]\n{format_message_pretty(last_msg)}"
+                                )
             except Exception as e:
                 log_error(logger, e, "log_updates background task")
 

@@ -1,8 +1,8 @@
 """Filesystem search tools (DeepAgent mode with full content access)."""
 
 from langchain_core.tools import tool
-from src.tools.blog.utils import build_blog_index, read_full_content
 
+from src.tools.blog.utils import build_blog_index, read_full_content
 
 # Build blog index once at module load time
 BLOG_INDEX = build_blog_index("data/blog")

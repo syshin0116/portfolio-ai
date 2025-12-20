@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Annotated
+from typing import Annotated, Dict, List
 
 from deepagents import create_deep_agent
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
@@ -19,6 +19,7 @@ from src.tools.rag import load_rag_tools
 
 class MultiRagState(TypedDict):
     """State for multi-RAG orchestration."""
+
     messages: Annotated[list, add_messages]
 
 

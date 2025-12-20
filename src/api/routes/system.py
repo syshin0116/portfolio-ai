@@ -8,11 +8,7 @@ router = APIRouter()
 @router.get("/")
 async def root():
     """Root endpoint."""
-    return {
-        "service": "Portfolio AI",
-        "status": "running",
-        "version": "0.0.1"
-    }
+    return {"service": "Portfolio AI", "status": "running", "version": "0.0.1"}
 
 
 @router.get("/health")
@@ -29,7 +25,7 @@ async def info():
         "capabilities": [
             "Search blog posts",
             "Get blog content",
-            "Answer questions about portfolio"
+            "Answer questions about portfolio",
         ],
-        "tools": ["search_blog_summaries", "get_blog_content"]
+        "tools": ["search_blog_summaries", "get_blog_content"],
     }

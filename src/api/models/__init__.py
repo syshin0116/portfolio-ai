@@ -1,6 +1,6 @@
 """API models."""
 
-from .runs import RunsStreamRequest, RagMode
+from .runs import RagMode, RunsStreamRequest
 
 __all__ = [
     "RunsStreamRequest",

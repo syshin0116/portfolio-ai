@@ -1,8 +1,8 @@
 """Metadata-only search tool (fast, lightweight)."""
 
 from langchain_core.tools import tool
-from src.tools.blog.utils import build_blog_index
 
+from src.tools.blog.utils import build_blog_index
 
 # Build blog index once at module load time
 BLOG_INDEX = build_blog_index("data/blog")

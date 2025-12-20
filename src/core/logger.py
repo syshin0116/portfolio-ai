@@ -1,11 +1,11 @@
 """Logging configuration for the application."""
 
+import json
 import logging
 import logging.config
-import sys
 from pathlib import Path
 from typing import Any, Dict
-import json
+
 import yaml
 
 # Configure logging format
@@ -14,7 +14,7 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def setup_logging(level: str = "INFO", config_file: str = "logging.yaml") -> None:
-    """Setup logging configuration from YAML file or fallback to basic config.
+    """Set up logging configuration from YAML file or fallback to basic config.
 
     Args:
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) - used if config_file not found
@@ -27,22 +27,26 @@ def setup_logging(level: str = "INFO", config_file: str = "logging.yaml") -> Non
             # Create logs directory if it doesn't exist
             Path("logs").mkdir(exist_ok=True)
 
-            with open(config_path, 'r') as f:
+            with open(config_path) as f:
                 config = yaml.safe_load(f)
                 logging.config.dictConfig(config)
             return
         except Exception as e:
-            print(f"Warning: Failed to load logging config from {config_file}: {e}")
-            print("Falling back to basic logging configuration")
+            # Use sys.stderr for early logging before config is set up
+            import sys
+
+            print(
+                f"Warning: Failed to load logging config from {config_file}: {e}",
+                file=sys.stderr,
+            )
+            print("Falling back to basic logging configuration", file=sys.stderr)
 
     # Fallback to basic configuration
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format=LOG_FORMAT,
         datefmt=DATE_FORMAT,
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
 
@@ -67,7 +71,9 @@ def log_request(logger: logging.Logger, endpoint: str, data: Dict[str, Any]) -> 
         data: Request data
     """
     logger.info(f"Request to {endpoint}")
-    logger.debug(f"Request data: {json.dumps(data, indent=2, ensure_ascii=False, default=str)}")
+    logger.debug(
+        f"Request data: {json.dumps(data, indent=2, ensure_ascii=False, default=str)}"
+    )
 
 
 def log_response(logger: logging.Logger, endpoint: str, success: bool = True) -> None:
@@ -102,5 +108,7 @@ def log_error(logger: logging.Logger, error: Exception, context: str = "") -> No
         error: Exception that occurred
         context: Additional context
     """
-    logger.error(f"Error{' in ' + context if context else ''}: {type(error).__name__}: {str(error)}")
-    logger.debug(f"Stack trace:", exc_info=True)
+    logger.error(
+        f"Error{' in ' + context if context else ''}: {type(error).__name__}: {str(error)}"
+    )
+    logger.debug("Stack trace:", exc_info=True)

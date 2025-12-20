@@ -4,6 +4,7 @@ This wraps the LangGraph agent for production deployment.
 """
 
 import os
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,12 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 # Setup logging
-from src.core.logger import setup_logging, get_logger
+from src.core.logger import get_logger, setup_logging
+
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
 
 # Import routers
-from src.api.routes import system_router, runs_router
+from src.api.routes import runs_router, system_router
 
 logger.info("Starting Portfolio AI application")
 
@@ -43,5 +45,6 @@ app.include_router(runs_router, tags=["Runs"])
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)

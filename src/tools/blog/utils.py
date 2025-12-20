@@ -118,6 +118,9 @@ def build_blog_index(content_dir: str | Path) -> list[dict[str, Any]]:
     Returns:
         List of blog post metadata dictionaries
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
     content_path = Path(content_dir)
     blog_index = []
 
@@ -129,7 +132,7 @@ def build_blog_index(content_dir: str | Path) -> list[dict[str, Any]]:
             if metadata["title"] or metadata["summary"]:
                 blog_index.append(metadata)
         except Exception as e:
-            print(f"Warning: Failed to parse {md_file}: {e}")
+            logger.warning(f"Failed to parse {md_file}: {e}")
             continue
 
     return blog_index

@@ -3,10 +3,10 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from src.api.models import RunsStreamRequest, RagMode
 from src.agent.graph import create_multi_rag_graph
-from src.core.streaming import generate_langgraph_stream
+from src.api.models import RagMode, RunsStreamRequest
 from src.core.logger import get_logger, log_request, log_response
+from src.core.streaming import generate_langgraph_stream
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -30,13 +30,17 @@ async def runs_stream(request: RunsStreamRequest):
     Returns:
         SSE stream compatible with LangGraph Server API format
     """
-    log_request(logger, "/runs/stream", {
-        "assistant_id": request.assistant_id,
-        "input": request.input,
-        "config": request.config,
-        "stream_mode": request.stream_mode,
-        "rag_modes": request.rag_modes
-    })
+    log_request(
+        logger,
+        "/runs/stream",
+        {
+            "assistant_id": request.assistant_id,
+            "input": request.input,
+            "config": request.config,
+            "stream_mode": request.stream_mode,
+            "rag_modes": request.rag_modes,
+        },
+    )
 
     config = request.config or {}
 
@@ -58,14 +62,14 @@ async def runs_stream(request: RunsStreamRequest):
             input_data=request.input,
             config=config,
             stream_mode=request.stream_mode,
-            assistant_id=request.assistant_id
+            assistant_id=request.assistant_id,
         ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
+            "X-Accel-Buffering": "no",
+        },
     )
 
     log_response(logger, "/runs/stream")

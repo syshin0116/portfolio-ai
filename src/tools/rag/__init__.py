@@ -1,7 +1,7 @@
 """RAG tools - dynamically loaded based on rag_modes."""
 
-from pathlib import Path
 from importlib import import_module
+from pathlib import Path
 from typing import List
 
 
@@ -14,6 +14,9 @@ def load_rag_tools(rag_modes: List[str]) -> list:
     Returns:
         List of LangChain tool objects
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
     tools = []
     rag_tools_dir = Path(__file__).parent
 
@@ -29,7 +32,7 @@ def load_rag_tools(rag_modes: List[str]) -> list:
                 if hasattr(module, "get_tools"):
                     tools.extend(module.get_tools())
             except Exception as e:
-                print(f"Warning: Failed to load tools from {mode}: {e}")
+                logger.warning(f"Failed to load tools from {mode}: {e}")
                 continue
 
     return tools

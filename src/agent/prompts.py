@@ -1,3 +1,5 @@
+"""Default system prompts for the agent."""
+
 DEFAULT_SYSTEM_PROMPT = """
 You are a technical blog assistant specialized in AI, development, and engineering topics.
 
