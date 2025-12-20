@@ -8,6 +8,7 @@ from src.api.models import RagMode, RunsStreamRequest
 from src.core.logger import get_logger, log_request, log_response
 from src.core.streaming import generate_langgraph_stream
 
+
 router = APIRouter()
 logger = get_logger(__name__)
 

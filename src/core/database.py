@@ -10,7 +10,6 @@ This module provides:
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg import AsyncConnection
@@ -25,7 +24,7 @@ logger = get_logger(__name__)
 class SupabaseClient:
     """Supabase database client with connection pooling."""
 
-    def __init__(self, connection_string: Optional[str] = None):
+    def __init__(self, connection_string: str | None = None):
         """Initialize Supabase client.
 
         Args:
@@ -40,8 +39,8 @@ class SupabaseClient:
                 "SUPABASE_CONNECTION_STRING environment variable is required"
             )
 
-        self._pool: Optional[AsyncConnectionPool] = None
-        self._checkpointer: Optional[AsyncPostgresSaver] = None
+        self._pool: AsyncConnectionPool | None = None
+        self._checkpointer: AsyncPostgresSaver | None = None
 
     async def initialize(self):
         """Initialize connection pool and checkpointer."""
@@ -101,9 +100,7 @@ class SupabaseClient:
             RuntimeError: If checkpointer is not initialized
         """
         if self._checkpointer is None:
-            raise RuntimeError(
-                "Checkpointer not initialized. Call initialize() first."
-            )
+            raise RuntimeError("Checkpointer not initialized. Call initialize() first.")
         return self._checkpointer
 
     async def get_connection(self) -> AsyncConnection:
@@ -167,7 +164,7 @@ class SupabaseClient:
 
 
 # Global client instance
-_supabase_client: Optional[SupabaseClient] = None
+_supabase_client: SupabaseClient | None = None
 
 
 def get_supabase_client() -> SupabaseClient:
@@ -187,7 +184,7 @@ def get_supabase_client() -> SupabaseClient:
     return _supabase_client
 
 
-async def init_supabase(connection_string: Optional[str] = None):
+async def init_supabase(connection_string: str | None = None):
     """Initialize global Supabase client.
 
     Args:

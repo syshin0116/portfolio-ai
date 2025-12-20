@@ -4,10 +4,12 @@ This wraps the LangGraph agent for production deployment.
 """
 
 import os
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 
 # Load environment variables
 load_dotenv()
@@ -15,18 +17,38 @@ load_dotenv()
 # Setup logging
 from src.core.logger import get_logger, setup_logging
 
+
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
 
 # Import routers
 from src.api.routes import runs_router, system_router
 
+
 logger.info("Starting Portfolio AI application")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Lifespan event handler for startup and shutdown."""
+    # Startup
+    logger.info("Initializing AsyncPostgresSaver...")
+    from src.agent.graph import init_checkpointer
+
+    await init_checkpointer()
+    logger.info("AsyncPostgresSaver initialized successfully")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down Portfolio AI application")
+
 
 app = FastAPI(
     title="Portfolio AI",
     description="AI assistant for Syshin's portfolio",
     version="0.0.1",
+    lifespan=lifespan,
 )
 
 # CORS middleware

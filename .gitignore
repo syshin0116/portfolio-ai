@@ -169,3 +169,6 @@ data/blog/.git/
 logs/
 *.log
 
+# MCP (Model Context Protocol) configuration
+.mcp.json
+

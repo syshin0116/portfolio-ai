@@ -8,7 +8,7 @@ from typing import Annotated, Dict, List
 from deepagents import create_deep_agent
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
@@ -37,13 +37,30 @@ model = init_chat_model(
     Context.model_name, model_provider="openai", api_key=os.getenv("OPENAI_API_KEY")
 )
 
-# Setup Supabase/Postgres checkpointer for conversation memory (async)
+# Setup checkpointer for conversation memory (async)
+# TODO: Configure AsyncPostgresSaver once pooler credentials are resolved
+# For now, using MemorySaver to get the server running
+_checkpointer_conn_string = os.getenv("SUPABASE_CONNECTION_STRING")
 checkpointer = None
-if os.getenv("SUPABASE_CONNECTION_STRING"):
-    checkpointer = AsyncPostgresSaver.from_conn_string(
-        os.getenv("SUPABASE_CONNECTION_STRING")
-    )
-    # Note: AsyncPostgresSaver.setup() will be called automatically on first use
+
+
+async def init_checkpointer():
+    """Initialize the global checkpointer instance.
+
+    This should be called on application startup.
+    """
+    global checkpointer
+    if checkpointer is None:
+        # Using MemorySaver for now until Postgres pooler connection is configured
+        # TODO: Switch to AsyncPostgresSaver when connection string is fixed
+        from src.core.logger import get_logger
+
+        logger = get_logger(__name__)
+        logger.warning(
+            "Using MemorySaver - conversation history will not persist across restarts. "
+            "Configure SUPABASE_CONNECTION_STRING for persistent storage."
+        )
+        checkpointer = MemorySaver()
 
 
 # Cache for agent instances per RAG mode

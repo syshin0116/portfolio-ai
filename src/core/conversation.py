@@ -9,8 +9,7 @@ This module provides utilities to:
 
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import uuid4
 
 from langgraph.checkpoint.base import CheckpointTuple
@@ -24,7 +23,7 @@ logger = get_logger(__name__)
 
 async def get_conversation_history(
     thread_id: str,
-    limit: Optional[int] = None,
+    limit: int | None = None,
 ) -> List[Dict[str, Any]]:
     """Get conversation history for a thread.
 
@@ -59,13 +58,18 @@ async def get_conversation_history(
         messages = []
         for checkpoint_tuple in reversed(checkpoints):  # Oldest first
             checkpoint = checkpoint_tuple.checkpoint
-            if "channel_values" in checkpoint and "messages" in checkpoint["channel_values"]:
+            if (
+                "channel_values" in checkpoint
+                and "messages" in checkpoint["channel_values"]
+            ):
                 for msg in checkpoint["channel_values"]["messages"]:
-                    messages.append({
-                        "role": getattr(msg, "type", "unknown"),
-                        "content": getattr(msg, "content", ""),
-                        "timestamp": checkpoint.get("ts"),
-                    })
+                    messages.append(
+                        {
+                            "role": getattr(msg, "type", "unknown"),
+                            "content": getattr(msg, "content", ""),
+                            "timestamp": checkpoint.get("ts"),
+                        }
+                    )
 
         return messages[-limit:] if limit else messages
 
@@ -75,7 +79,7 @@ async def get_conversation_history(
 
 
 async def list_conversations(
-    user_id: Optional[str] = None,
+    user_id: str | None = None,
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
     """List all conversations, optionally filtered by user.
@@ -122,14 +126,22 @@ async def list_conversations(
 
             # Update last_updated timestamp
             ts = checkpoint.get("ts")
-            if ts and (not conversations[thread_id]["last_updated"] or ts > conversations[thread_id]["last_updated"]):
+            if ts and (
+                not conversations[thread_id]["last_updated"]
+                or ts > conversations[thread_id]["last_updated"]
+            ):
                 conversations[thread_id]["last_updated"] = ts
 
             # Store first message as preview
-            if "channel_values" in checkpoint and "messages" in checkpoint["channel_values"]:
+            if (
+                "channel_values" in checkpoint
+                and "messages" in checkpoint["channel_values"]
+            ):
                 messages = checkpoint["channel_values"]["messages"]
                 if messages and not conversations[thread_id]["first_message"]:
-                    conversations[thread_id]["first_message"] = getattr(messages[0], "content", "")[:100]
+                    conversations[thread_id]["first_message"] = getattr(
+                        messages[0], "content", ""
+                    )[:100]
 
         # Convert to list and sort by last_updated
         result = list(conversations.values())
@@ -168,7 +180,7 @@ async def delete_conversation(thread_id: str) -> bool:
             DELETE FROM checkpoints
             WHERE thread_id = %s
             """,
-            (thread_id,)
+            (thread_id,),
         )
 
         await client.execute_command(
@@ -176,7 +188,7 @@ async def delete_conversation(thread_id: str) -> bool:
             DELETE FROM checkpoint_writes
             WHERE thread_id = %s
             """,
-            (thread_id,)
+            (thread_id,),
         )
 
         logger.info(f"Deleted conversation: {thread_id}")
@@ -187,7 +199,7 @@ async def delete_conversation(thread_id: str) -> bool:
         return False
 
 
-async def get_checkpoint_metadata(thread_id: str) -> Optional[Dict[str, Any]]:
+async def get_checkpoint_metadata(thread_id: str) -> Dict[str, Any] | None:
     """Get metadata for a specific checkpoint/thread.
 
     Args:
