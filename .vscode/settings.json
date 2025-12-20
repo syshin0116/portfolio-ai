@@ -1,0 +1,27 @@
+{
+  // Ruff 설정
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  // Ruff 활성화
+  "ruff.enable": true,
+  "ruff.organizeImports": true,
+  "ruff.fixAll": true,
+  "ruff.configurationPreference": "filesystemFirst",
+  "ruff.path": ["/Users/syshin/.local/bin/ruff"],
+  "ruff.importStrategy": "fromEnvironment",
+
+  // 다른 Python linter 비활성화
+  "python.linting.enabled": false,
+  "python.formatting.provider": "none",
+
+  // 파일 저장 시 공백 정리
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true
+}

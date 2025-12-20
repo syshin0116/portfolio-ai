@@ -59,11 +59,19 @@ lint.ignore = [
     # Relax the convention by _not_ requiring documentation for every function parameter.
     "D417",
     "E501",
+    # Allow blank lines in imports (user preference)
+    # "I001",  # Uncomment to disable import sorting completely
 ]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D", "UP"]
 "main.py" = ["E402"]  # Module imports after load_dotenv() is intentional
 "src/core/logger.py" = ["T201"]  # print to stderr before logging is configured
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+force-single-line = false
+split-on-trailing-comma = true
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 

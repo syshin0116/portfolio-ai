@@ -119,9 +119,9 @@ def create_multi_rag_graph(rag_modes: List[str]):
     for rag_mode in rag_modes:
         graph_builder.add_edge(rag_mode, END)
 
-    # Compile and return
-    # Note: checkpointer disabled for multi-rag graphs to avoid state conflicts
-    return graph_builder.compile()
+    # Compile with checkpointer for conversation memory
+    # Each thread_id in config will have its own checkpoint history
+    return graph_builder.compile(checkpointer=checkpointer)
 
 
 # For backward compatibility - single agent with metadata_search
