@@ -51,16 +51,26 @@ async def init_checkpointer():
     """
     global checkpointer
     if checkpointer is None:
-        # Using MemorySaver for now until Postgres pooler connection is configured
-        # TODO: Switch to AsyncPostgresSaver when connection string is fixed
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
         from src.core.logger import get_logger
 
         logger = get_logger(__name__)
-        logger.warning(
-            "Using MemorySaver - conversation history will not persist across restarts. "
-            "Configure SUPABASE_CONNECTION_STRING for persistent storage."
-        )
-        checkpointer = MemorySaver()
+
+        if _checkpointer_conn_string:
+            logger.info("Initializing AsyncPostgresSaver with Supabase...")
+            async with AsyncPostgresSaver.from_conn_string(
+                _checkpointer_conn_string
+            ) as saver:
+                await saver.setup()
+                checkpointer = saver
+                logger.info("AsyncPostgresSaver initialized successfully")
+        else:
+            logger.warning(
+                "Using MemorySaver - conversation history will not persist across restarts. "
+                "Configure SUPABASE_CONNECTION_STRING for persistent storage."
+            )
+            checkpointer = MemorySaver()
 
 
 # Cache for agent instances per RAG mode
