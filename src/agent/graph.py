@@ -13,8 +13,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
-from src.agent.prompts import DEFAULT_SYSTEM_PROMPT
-from src.tools.rag import load_rag_tools
+from src.agent.backends import create_default_backend
 
 
 class MultiRagState(TypedDict):
@@ -90,8 +89,26 @@ def get_agent_for_rag_mode(rag_mode: str):
         Compiled LangGraph agent (either simple agent or DeepAgent)
     """
     if rag_mode not in _agents:
-        # Load tools specific to this RAG mode
-        tools = load_rag_tools([rag_mode])
+        # Import agent config dynamically
+        try:
+            agent_module = __import__(
+                f"src.agents.{rag_mode}", fromlist=["AGENT_CONFIG", "SYSTEM_PROMPT"]
+            )
+            agent_config = agent_module.AGENT_CONFIG
+            agent_system_prompt = agent_module.SYSTEM_PROMPT
+        except ImportError:
+            raise ValueError(f"Unknown RAG mode: {rag_mode}")
+
+        # Get tools from agent config
+        tools = agent_config["tools"]()
+
+        # Load SKILL.md documentation
+        skill_docs = agent_config["skills"]()
+
+        # Combine system prompt with skill documentation
+        full_system_prompt = agent_system_prompt
+        if skill_docs:
+            full_system_prompt = f"{agent_system_prompt}\n\n# Tool Documentation\n\n{skill_docs}"
 
         if rag_mode == "metadata_search":
             # Simple agent for metadata search (no deep reasoning needed)
@@ -101,10 +118,16 @@ def get_agent_for_rag_mode(rag_mode: str):
             )
         else:
             # DeepAgent for complex RAG modes (vector, graph, filesystem, etc.)
+            # Check if agent needs special backend (e.g., FilesystemBackend)
+            backend = None
+            if agent_config.get("backend") == "filesystem":
+                backend = create_default_backend()
+
             _agents[rag_mode] = create_deep_agent(
                 model=model,
-                system_prompt=DEFAULT_SYSTEM_PROMPT,
+                system_prompt=full_system_prompt,
                 tools=tools,
+                backend=backend,
                 # checkpointer=checkpointer,  # Disabled for now
             )
 
