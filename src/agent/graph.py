@@ -174,6 +174,18 @@ def create_multi_rag_graph(rag_modes: List[str]):
     return graph_builder.compile(checkpointer=checkpointer)
 
 
+def create_auto_single_agent_graph():
+    """Create AUTO mode graph with single agent that has all tools.
+
+    The agent automatically selects appropriate tools based on the query.
+    Uses SKILL.md documentation to guide tool selection.
+
+    Returns:
+        Compiled StateGraph with auto_single_agent
+    """
+    return create_multi_rag_graph(["auto_single_agent"])
+
+
 # For backward compatibility - single agent with metadata_search
 def get_agent(rag_mode: str = "metadata_search"):
     """Get a single-mode agent (backward compatibility).
