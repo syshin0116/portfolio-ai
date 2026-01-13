@@ -55,18 +55,31 @@ async def init_checkpointer():
 
         logger = get_logger(__name__)
 
-        # Always use MemorySaver for now to ensure server starts quickly
-        # PostgreSQL checkpointing can be enabled later once connection issues are resolved
-        logger.warning(
-            "Using MemorySaver - conversation history will not persist across restarts. "
-            "Configure SUPABASE_CONNECTION_STRING for persistent storage."
-        )
-        checkpointer = MemorySaver()
+        if _checkpointer_conn_string:
+            try:
+                from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-        # Optional: Try to initialize PostgreSQL in background (non-blocking)
-        # if _checkpointer_conn_string:
-        #     import asyncio
-        #     asyncio.create_task(_init_postgres_checkpointer_background())
+                logger.info("Initializing AsyncPostgresSaver with Supabase...")
+
+                # Create PostgreSQL connection without async with to keep it alive
+                checkpointer = await AsyncPostgresSaver.from_conn_string(
+                    _checkpointer_conn_string
+                ).__aenter__()
+
+                # Setup database schema
+                await checkpointer.setup()
+
+                logger.info("AsyncPostgresSaver initialized successfully - conversation history will persist")
+            except Exception as e:
+                logger.error(f"Failed to initialize AsyncPostgresSaver: {e}")
+                logger.warning("Falling back to MemorySaver - conversation history will not persist")
+                checkpointer = MemorySaver()
+        else:
+            logger.warning(
+                "SUPABASE_CONNECTION_STRING not configured - using MemorySaver. "
+                "Conversation history will not persist across restarts."
+            )
+            checkpointer = MemorySaver()
 
 
 # Cache for agent instances per RAG mode
